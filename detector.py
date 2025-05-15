@@ -196,9 +196,9 @@ def analizar_proyecto(directorio):
 
     fin = time.time()
     estadisticas = {
-        "archivos": len(archivos_analizados),
-        "lineas_afectadas": len(lineas_unicas),
-        "tiempo": round(fin - inicio, 2)
+        "archivos analizados": len(archivos_analizados),
+        "lineas afectadas": len(lineas_unicas),
+        "tiempo de analisis": round(fin - inicio, 2)
     }
     return resultados, estadisticas, grafo
 

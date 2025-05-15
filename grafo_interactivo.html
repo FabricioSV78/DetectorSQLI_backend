@@ -1,0 +1,155 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 800px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "lightgreen", "id": "AppData", "label": "AppData", "shape": "dot"}, {"color": "skyblue", "id": "AppData.getAppData", "label": "AppData.getAppData", "shape": "dot"}, {"color": "red", "id": "AppData.addPerson", "label": "AppData.addPerson", "shape": "dot"}, {"color": "red", "id": "AppData.addPerson.person", "label": "AppData.addPerson.person", "shape": "dot"}, {"color": "mediumseagreen", "id": "AppData.addPerson.INTO", "label": "AppData.addPerson.INTO", "shape": "dot"}, {"color": "red", "id": "AppData.getPerson", "label": "AppData.getPerson", "shape": "dot"}, {"color": "red", "id": "AppData.getPerson.firstName", "label": "AppData.getPerson.firstName", "shape": "dot"}, {"color": "red", "id": "AppData.getPerson.lastName", "label": "AppData.getPerson.lastName", "shape": "dot"}, {"color": "mediumseagreen", "id": "AppData.getPerson.PERSON", "label": "AppData.getPerson.PERSON", "shape": "dot"}, {"color": "red", "id": "AppData.deletePerson", "label": "AppData.deletePerson", "shape": "dot"}, {"color": "red", "id": "AppData.deletePerson.firstName", "label": "AppData.deletePerson.firstName", "shape": "dot"}, {"color": "red", "id": "AppData.deletePerson.lastName", "label": "AppData.deletePerson.lastName", "shape": "dot"}, {"color": "mediumseagreen", "id": "AppData.deletePerson.FROM", "label": "AppData.deletePerson.FROM", "shape": "dot"}, {"color": "mediumseagreen", "id": "AppData.deletePerson.WHERE", "label": "AppData.deletePerson.WHERE", "shape": "dot"}, {"color": "skyblue", "id": "AppData.findAllPeople", "label": "AppData.findAllPeople", "shape": "dot"}, {"color": "mediumseagreen", "id": "AppData.findAllPeople.PERSON", "label": "AppData.findAllPeople.PERSON", "shape": "dot"}, {"color": "skyblue", "id": "AppData.closeConnection", "label": "AppData.closeConnection", "shape": "dot"}, {"color": "lightgreen", "id": "DatabaseConnection", "label": "DatabaseConnection", "shape": "dot"}, {"color": "skyblue", "id": "DatabaseConnection.getConnection", "label": "DatabaseConnection.getConnection", "shape": "dot"}, {"color": "skyblue", "id": "DatabaseConnection.CreateNewConnection", "label": "DatabaseConnection.CreateNewConnection", "shape": "dot"}, {"color": "mediumseagreen", "id": "DatabaseConnection.CreateNewConnection.TABLE", "label": "DatabaseConnection.CreateNewConnection.TABLE", "shape": "dot"}, {"color": "mediumseagreen", "id": "DatabaseConnection.CreateNewConnection.NOT", "label": "DatabaseConnection.CreateNewConnection.NOT", "shape": "dot"}, {"color": "mediumseagreen", "id": "DatabaseConnection.CreateNewConnection.PERSON", "label": "DatabaseConnection.CreateNewConnection.PERSON", "shape": "dot"}, {"color": "mediumseagreen", "id": "DatabaseConnection.CreateNewConnection.TEXT", "label": "DatabaseConnection.CreateNewConnection.TEXT", "shape": "dot"}, {"color": "mediumseagreen", "id": "DatabaseConnection.CreateNewConnection.NULL", "label": "DatabaseConnection.CreateNewConnection.NULL", "shape": "dot"}, {"color": "red", "id": "DatabaseConnection.vulnerableQuery", "label": "DatabaseConnection.vulnerableQuery", "shape": "dot"}, {"color": "red", "id": "DatabaseConnection.vulnerableQuery.userInput", "label": "DatabaseConnection.vulnerableQuery.userInput", "shape": "dot"}, {"color": "mediumseagreen", "id": "DatabaseConnection.vulnerableQuery.PERSON", "label": "DatabaseConnection.vulnerableQuery.PERSON", "shape": "dot"}, {"color": "mediumseagreen", "id": "DatabaseConnection.vulnerableQuery.FIRSTNAME", "label": "DatabaseConnection.vulnerableQuery.FIRSTNAME", "shape": "dot"}]);
+                  edges = new vis.DataSet([{"arrows": "to", "from": "AppData", "to": "AppData.getAppData"}, {"arrows": "to", "from": "AppData", "to": "AppData.addPerson"}, {"arrows": "to", "from": "AppData", "to": "AppData.getPerson"}, {"arrows": "to", "from": "AppData", "to": "AppData.deletePerson"}, {"arrows": "to", "from": "AppData", "to": "AppData.findAllPeople"}, {"arrows": "to", "from": "AppData", "to": "AppData.closeConnection"}, {"arrows": "to", "from": "AppData.addPerson", "to": "AppData.addPerson.person"}, {"arrows": "to", "from": "AppData.addPerson", "to": "AppData.addPerson.INTO"}, {"arrows": "to", "from": "AppData.getPerson", "to": "AppData.getPerson.firstName"}, {"arrows": "to", "from": "AppData.getPerson", "to": "AppData.getPerson.lastName"}, {"arrows": "to", "from": "AppData.getPerson", "to": "AppData.getPerson.PERSON"}, {"arrows": "to", "from": "AppData.deletePerson", "to": "AppData.deletePerson.firstName"}, {"arrows": "to", "from": "AppData.deletePerson", "to": "AppData.deletePerson.lastName"}, {"arrows": "to", "from": "AppData.deletePerson", "to": "AppData.deletePerson.FROM"}, {"arrows": "to", "from": "AppData.deletePerson", "to": "AppData.deletePerson.WHERE"}, {"arrows": "to", "from": "AppData.findAllPeople", "to": "AppData.findAllPeople.PERSON"}, {"arrows": "to", "from": "DatabaseConnection", "to": "DatabaseConnection.getConnection"}, {"arrows": "to", "from": "DatabaseConnection", "to": "DatabaseConnection.CreateNewConnection"}, {"arrows": "to", "from": "DatabaseConnection", "to": "DatabaseConnection.vulnerableQuery"}, {"arrows": "to", "from": "DatabaseConnection.CreateNewConnection", "to": "DatabaseConnection.CreateNewConnection.TABLE"}, {"arrows": "to", "from": "DatabaseConnection.CreateNewConnection", "to": "DatabaseConnection.CreateNewConnection.NOT"}, {"arrows": "to", "from": "DatabaseConnection.CreateNewConnection", "to": "DatabaseConnection.CreateNewConnection.PERSON"}, {"arrows": "to", "from": "DatabaseConnection.CreateNewConnection", "to": "DatabaseConnection.CreateNewConnection.TEXT"}, {"arrows": "to", "from": "DatabaseConnection.CreateNewConnection", "to": "DatabaseConnection.CreateNewConnection.NULL"}, {"arrows": "to", "from": "DatabaseConnection.vulnerableQuery", "to": "DatabaseConnection.vulnerableQuery.userInput"}, {"arrows": "to", "from": "DatabaseConnection.vulnerableQuery", "to": "DatabaseConnection.vulnerableQuery.PERSON"}, {"arrows": "to", "from": "DatabaseConnection.vulnerableQuery", "to": "DatabaseConnection.vulnerableQuery.FIRSTNAME"}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>
