@@ -273,9 +273,13 @@ def mostrar_resultados(resultados, estadisticas):
             print(f"   - {d}")
 
     print("\n=== RESUMEN ===")
-    print(f"Archivos analizados      : {estadisticas['archivos']}")
-    print(f"Líneas con vulnerabilidad: {estadisticas['lineas_afectadas']}")
-    print(f"Tiempo total de análisis : {estadisticas['tiempo']} segundos")
+    print(f"Archivos analizados      : {estadisticas['archivos analizados']}")
+    print(f"Líneas con vulnerabilidad: {estadisticas['lineas afectadas']}")
+    print(f"Tiempo total de análisis : {estadisticas['tiempo de analisis']} segundos")
+
+    if 'clases fuera de estándar' in estadisticas:
+        print(f"Clases fuera de estándar : {estadisticas['clases fuera de estándar']}")
+
 
 # --------------------------- EJEMPLO DE USO ---------------------------
 
