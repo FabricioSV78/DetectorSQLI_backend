@@ -1,6 +1,7 @@
 import time
 import re
 import os
+import json
 from collections import defaultdict
 from antlr4 import *
 from JavaLexer import JavaLexer
@@ -170,6 +171,9 @@ class SQLiDetector(JavaParserListener):
         self.alertas_por_linea[linea].append(alerta)
 
 # --------------------------- ANALIZADOR DE PROYECTO ---------------------------
+def guardar_resultados_en_json(resultados, path="resultados.json"):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(resultados, f, indent=2, ensure_ascii=False)
 
 def analizar_proyecto(directorio):
     resultados = []
@@ -213,6 +217,8 @@ def analizar_proyecto(directorio):
         "lineas afectadas": len(lineas_unicas),
         "tiempo de analisis": round(fin - inicio, 2)
     }
+    guardar_resultados_en_json(resultados)
+    print(f"Análisis terminado. {len(resultados)} fragmentos con alertas.")
     return resultados, estadisticas, grafo
 
 def mostrar_grafo_codigo(grafo):
