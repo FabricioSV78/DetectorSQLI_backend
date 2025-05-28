@@ -6,6 +6,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 from fpdf import FPDF
 from fastapi.middleware.cors import CORSMiddleware
+from unidecode import unidecode
 from detector import analizar_proyecto, mostrar_grafo_interactivo
 
 
@@ -110,9 +111,9 @@ async def list_files():
 
 @app.get("/grafo")
 async def mostrar_grafo():
+    from detector import mostrar_grafo_interactivo
     mostrar_grafo_interactivo(grafo)
-    return
-
+    return FileResponse("grafo_interactivo.html", media_type="text/html")
 
 
 @app.get("/file/{nombre_archivo:path}")
@@ -124,8 +125,6 @@ async def get_file_details(nombre_archivo: str):
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
     return analysis_results[ruta_normalizada]
-
-
 
 
 @app.get("/report/download")
@@ -147,27 +146,30 @@ async def download_report():
         pdf.cell(200, 8, txt="Resumen del análisis", ln=True, fill=True)
         pdf.set_font("Arial", '', 11)
         for clave, valor in analysis_stats.items():
-            pdf.cell(200, 8, txt=f"{clave}: {valor}", ln=True)
+            texto = unidecode(f"{clave}: {valor}")
+            pdf.cell(200, 8, txt=texto, ln=True)
         pdf.ln(5)
 
     # Vulnerabilidades por archivo
-    for archivo, registros in analysis_results.items():
+    for archivo, contenido in analysis_results.items():
         pdf.set_font("Arial", 'B', 12)
         pdf.set_fill_color(200, 220, 255)
-        pdf.cell(200, 8, txt=f"Archivo: {archivo}", ln=True, fill=True)
+        pdf.cell(200, 8, txt=unidecode(f"Archivo: {archivo}"), ln=True, fill=True)
+
+        registros = contenido.get("vulnerabilidades", [])
         for entry in registros:
             pdf.set_font("Arial", 'B', 11)
-            pdf.cell(200, 6, txt=f"Línea: {entry['linea']}", ln=True)
+            pdf.cell(200, 6, txt=unidecode(f"Línea: {entry['linea']}"), ln=True)
             pdf.set_font("Arial", 'I', 10)
             pdf.set_text_color(80)
             for linea in entry['codigo'].splitlines():
-                pdf.multi_cell(0, 5, f"  {linea}")
+                pdf.multi_cell(0, 5, unidecode(f"  {linea}"))
             pdf.set_text_color(0)
             pdf.set_font("Arial", '', 10)
-            pdf.cell(200, 6, txt=f"Detalles:", ln=True)
+            pdf.cell(200, 6, txt="Detalles:", ln=True)
             for detalle in entry.get("detalles", []):
-                detalle = detalle.replace("→", "->")
-                pdf.multi_cell(0, 6, f"    - {detalle}")
+                limpio = unidecode(detalle.replace("→", "->"))
+                pdf.multi_cell(0, 6, f"    - {limpio}")
             pdf.ln(4)
         pdf.ln(5)
 

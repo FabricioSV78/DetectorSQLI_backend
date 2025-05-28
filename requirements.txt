@@ -6,3 +6,4 @@ networkx
 matplotlib
 pyvis
 python-multipart
+unidecode
