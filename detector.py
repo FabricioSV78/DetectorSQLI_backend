@@ -61,9 +61,18 @@ class SQLiDetector(JavaParserListener):
     def enterClassDeclaration(self, ctx):
         self.clase_actual = ctx.identifier().getText()
         self.capa_actual = determinar_capa_desde_archivo(self.archivo_actual, self.nombre_paquete, self.clase_actual)
+
+        if self.capa_actual == "desconocida":
+            print(f"[IGNORADO] Clase fuera de estándar: {self.clase_actual} en archivo {self.archivo_actual}")
+            self.clase_actual = None
+            return
+
         self.grafo_codigo.add_node(self.clase_actual, tipo="clase")
 
+
     def enterMethodDeclaration(self, ctx):
+        if self.clase_actual is None:
+            return
         self.metodo_actual = ctx.identifier().getText()
         metodo_id = f"{self.clase_actual}.{self.metodo_actual}"
         self.grafo_codigo.add_node(metodo_id, tipo="metodo")
@@ -80,6 +89,8 @@ class SQLiDetector(JavaParserListener):
                         self.variables_riesgosas[nombre_param] = (ctx.start.line, "PARAMETER")
 
     def enterLocalVariableDeclaration(self, ctx):
+        if self.clase_actual is None:
+            return
         texto = ctx.getText()
         texto_up = texto.upper()
         linea = ctx.start.line
@@ -100,6 +111,8 @@ class SQLiDetector(JavaParserListener):
                             f"Se usa la variable '{var}' directamente en una sentencia SQL en la capa '{self.capa_actual.upper()}'. Esto puede permitir inyección SQL si no se valida correctamente.")
 
     def enterStatement(self, ctx):
+        if self.clase_actual is None:
+            return
         texto = ctx.getText()
         texto_up = texto.upper()
         linea = ctx.start.line
@@ -260,13 +273,9 @@ def mostrar_resultados(resultados, estadisticas):
             print(f"   - {d}")
 
     print("\n=== RESUMEN ===")
-    print(f"Archivos analizados      : {estadisticas['archivos analizados']}")
-    print(f"Líneas con vulnerabilidad: {estadisticas['lineas afectadas']}")
-    print(f"Tiempo total de análisis : {estadisticas['tiempo de analisis']} segundos")
-
-    if 'clases fuera de estándar' in estadisticas:
-        print(f"Clases fuera de estándar : {estadisticas['clases fuera de estándar']}")
-
+    print(f"Archivos analizados      : {estadisticas['archivos']}")
+    print(f"Líneas con vulnerabilidad: {estadisticas['lineas_afectadas']}")
+    print(f"Tiempo total de análisis : {estadisticas['tiempo']} segundos")
 
 # --------------------------- EJEMPLO DE USO ---------------------------
 
