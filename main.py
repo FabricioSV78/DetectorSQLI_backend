@@ -69,9 +69,6 @@ async def upload_project(file: UploadFile = File(...)):
                         print(f" - {ruta}")
 
 
-
-
-
     # Ejecutar el detector real
     resultados, stats, grafo = analizar_proyecto(EXTRACTED_DIR)
     analysis_stats = stats
@@ -111,14 +108,18 @@ async def mostrar_grafo():
 
 
 
-@app.get("/file/{nombre_archivo}")
+@app.get("/file/{nombre_archivo:path}")
 async def get_file_details(nombre_archivo: str):
-    if nombre_archivo not in file_contents:
+    ruta_normalizada = nombre_archivo.replace("\\", "/")
+    if ruta_normalizada not in file_contents:
+        print(f"NO SE ENCONTRÓ: {ruta_normalizada}")
+        print("DISPONIBLES:", list(file_contents.keys()))
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
     return {
-        "codigo": file_contents[nombre_archivo],
-        "vulnerabilidades": analysis_results.get(nombre_archivo, [])
+        "codigo": file_contents[ruta_normalizada],
+        "vulnerabilidades": analysis_results.get(ruta_normalizada, [])
     }
+
 
 
 @app.get("/report/download")
