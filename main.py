@@ -91,10 +91,12 @@ async def upload_project(file: UploadFile = File(...)):
         })
 
     return {
-        "status": "Proyecto analizado",
-        "archivos": list(file_contents.keys()),
-        "estadisticas": analysis_stats
+    "status": "Proyecto analizado",
+    "archivos": list(file_contents.keys()),
+    "estadisticas": analysis_stats,
+    "resultados": analysis_results  
     }
+
 
 
 @app.get("/files")

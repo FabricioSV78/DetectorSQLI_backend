@@ -1,6 +1,6 @@
 [
   {
-    "archivo": "C:\\Users\\PC\\Downloads\\ejemplo_ncapas_vulnerable\\src\\com\\miapp\\datos\\UsuarioDAO.java",
+    "archivo": "project\\src\\com\\miapp\\datos\\UsuarioDAO.java",
     "linea": 11,
     "codigo": "// ✅ Forma segura (sin vulnerabilidad):\n        String query = \"SELECT * FROM usuarios WHERE id = ?\";\n        PreparedStatement ps = conn.prepareStatement(query);",
     "detalles": [
@@ -8,7 +8,7 @@
     ]
   },
   {
-    "archivo": "C:\\Users\\PC\\Downloads\\ejemplo_ncapas_vulnerable\\src\\com\\miapp\\datos\\UsuarioDAO.java",
+    "archivo": "project\\src\\com\\miapp\\datos\\UsuarioDAO.java",
     "linea": 19,
     "codigo": "// ❌ Mala práctica incluso en la capa DAO:\n        String query = \"SELECT * FROM usuarios WHERE id = \" + id;\n        conn.createStatement().executeQuery(query);",
     "detalles": [
@@ -16,7 +16,7 @@
     ]
   },
   {
-    "archivo": "C:\\Users\\PC\\Downloads\\ejemplo_ncapas_vulnerable\\src\\com\\miapp\\logica\\UsuarioService.java",
+    "archivo": "project\\src\\com\\miapp\\logica\\UsuarioService.java",
     "linea": 7,
     "codigo": "// ❌ Este método debería validar la entrada antes de usarla\n        return \"SELECT * FROM usuarios WHERE id = \" + id;\n    }",
     "detalles": [
@@ -25,7 +25,7 @@
     ]
   },
   {
-    "archivo": "C:\\Users\\PC\\Downloads\\ejemplo_ncapas_vulnerable\\src\\com\\miapp\\presentacion\\UsuarioController.java",
+    "archivo": "project\\src\\com\\miapp\\presentacion\\UsuarioController.java",
     "linea": 12,
     "codigo": "try {\n            Statement stmt = conn.createStatement(); // ❌ Mala práctica fuera de DAO",
     "detalles": [
