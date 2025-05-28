@@ -64,6 +64,12 @@ async def upload_project(file: UploadFile = File(...)):
                     code = f.read()
                     rel_path = os.path.relpath(path, os.path.join(EXTRACTED_DIR, "src")).replace("\\", "/")
                     file_contents[rel_path] = code
+                    print("ARCHIVOS REGISTRADOS EN file_contents:")
+                    for ruta in file_contents:
+                        print(f" - {ruta}")
+
+
+
 
 
     # Ejecutar el detector real
