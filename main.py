@@ -62,8 +62,9 @@ async def upload_project(file: UploadFile = File(...)):
                 path = os.path.join(root, name)
                 with open(path, encoding="utf-8", errors="ignore") as f:
                     code = f.read()
-                    rel_path = os.path.relpath(path, EXTRACTED_DIR)
+                    rel_path = os.path.relpath(path, EXTRACTED_DIR).replace("\\", "/")
                     file_contents[rel_path] = code
+
 
     # Ejecutar el detector real
     resultados, stats, grafo = analizar_proyecto(EXTRACTED_DIR)
