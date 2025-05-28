@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+fpdf
+antlr4-python3-runtime
+networkx
+matplotlib
+pyvis

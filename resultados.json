@@ -1,0 +1,72 @@
+[
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\businesslayer\\AppData.java",
+    "linea": 54,
+    "codigo": "try {\n\t\t\tconn.setAutoCommit(false);",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'person' directamente en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL si no se valida correctamente.",
+      "[CRÍTICO] SQLi por concatenación: La variable 'person' contaminada se concatena en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL.",
+      "[CRÍTICO] Violación de arquitectura N-capas: En la capa 'LOGICA' no está permitido ejecutar sentencias SQL directamente. Las operaciones SQL deben realizarse solo en la capa de datos."
+    ]
+  },
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\businesslayer\\AppData.java",
+    "linea": 57,
+    "codigo": "stmt = conn.createStatement();\n\t\t\tString info = \"INSERT INTO PERSON (FIRSTNAME,LASTNAME,DATEOFBIRTH,AGE,EMAIL,PHONENUMBER,ADDRESS1,ADDRESS2,CITY,ZIP,STATE,COUNTRY) \"\n\t\t\t\t\t+ \"VALUES ('\" + person.getFirstName().toString() + \"','\" + person.getLastName().toString() + \"','\"",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'person' directamente en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL si no se valida correctamente."
+    ]
+  },
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\businesslayer\\AppData.java",
+    "linea": 78,
+    "codigo": "Person person = null;\n\t\ttry {\n\t\t\tconn = DatabaseConnection.getConnection();",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'person' directamente en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL si no se valida correctamente.",
+      "[CRÍTICO] SQLi por concatenación: La variable 'person' contaminada se concatena en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL.",
+      "[CRÍTICO] Violación de arquitectura N-capas: En la capa 'LOGICA' no está permitido ejecutar sentencias SQL directamente. Las operaciones SQL deben realizarse solo en la capa de datos."
+    ]
+  },
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\businesslayer\\AppData.java",
+    "linea": 83,
+    "codigo": "ResultSet result = stmt.executeQuery(\n\t\t\t\t\"SELECT * FROM PERSON WHERE (FIRSTNAME = '\" + firstName + \"') and (LASTNAME = '\" + lastName + \"')\");",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'firstName' directamente en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL si no se valida correctamente."
+    ]
+  },
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\businesslayer\\AppData.java",
+    "linea": 103,
+    "codigo": "Statement stmt = null;\n\t\ttry {\n\t\t\tconn = DatabaseConnection.getConnection();",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'firstName' directamente en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL si no se valida correctamente.",
+      "[CRÍTICO] SQLi por concatenación: La variable 'firstName' contaminada se concatena en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL.",
+      "[CRÍTICO] Violación de arquitectura N-capas: En la capa 'LOGICA' no está permitido ejecutar sentencias SQL directamente. Las operaciones SQL deben realizarse solo en la capa de datos."
+    ]
+  },
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\businesslayer\\AppData.java",
+    "linea": 108,
+    "codigo": "String deleteQuery = \"DELETE FROM PERSON WHERE (FIRSTNAME = '\" + firstName + \"') and (LASTNAME = '\"\n\t\t\t\t\t+ lastName + \"');\";",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'firstName' directamente en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL si no se valida correctamente."
+    ]
+  },
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\businesslayer\\AppData.java",
+    "linea": 123,
+    "codigo": "Statement stmnt = null;\n\t\ttry {\n\t\t\tconn = DatabaseConnection.getConnection();",
+    "detalles": [
+      "[CRÍTICO] Violación de arquitectura N-capas: En la capa 'LOGICA' no está permitido ejecutar sentencias SQL directamente. Las operaciones SQL deben realizarse solo en la capa de datos."
+    ]
+  },
+  {
+    "archivo": "project\\Three-Tier-Architecture-master\\Three-Tier-Architecture-master\\src\\datalayer\\DatabaseConnection.java",
+    "linea": 45,
+    "codigo": "Statement stmt = conn.createStatement();\n        String sql = \"SELECT * FROM PERSON WHERE FIRSTNAME = '\" + userInput + \"'\";\n        stmt.executeQuery(sql);",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'userInput' directamente en una sentencia SQL en la capa 'DATOS'. Esto puede permitir inyección SQL si no se valida correctamente."
+    ]
+  }
+]

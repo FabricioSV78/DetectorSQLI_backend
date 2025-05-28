@@ -196,9 +196,9 @@ def analizar_proyecto(directorio):
 
     fin = time.time()
     estadisticas = {
-        "archivos": len(archivos_analizados),
-        "lineas_afectadas": len(lineas_unicas),
-        "tiempo": round(fin - inicio, 2)
+        "archivos analizados": len(archivos_analizados),
+        "lineas afectadas": len(lineas_unicas),
+        "tiempo de analisis": round(fin - inicio, 2)
     }
     return resultados, estadisticas, grafo
 
@@ -260,9 +260,13 @@ def mostrar_resultados(resultados, estadisticas):
             print(f"   - {d}")
 
     print("\n=== RESUMEN ===")
-    print(f"Archivos analizados      : {estadisticas['archivos']}")
-    print(f"Líneas con vulnerabilidad: {estadisticas['lineas_afectadas']}")
-    print(f"Tiempo total de análisis : {estadisticas['tiempo']} segundos")
+    print(f"Archivos analizados      : {estadisticas['archivos analizados']}")
+    print(f"Líneas con vulnerabilidad: {estadisticas['lineas afectadas']}")
+    print(f"Tiempo total de análisis : {estadisticas['tiempo de analisis']} segundos")
+
+    if 'clases fuera de estándar' in estadisticas:
+        print(f"Clases fuera de estándar : {estadisticas['clases fuera de estándar']}")
+
 
 # --------------------------- EJEMPLO DE USO ---------------------------
 
