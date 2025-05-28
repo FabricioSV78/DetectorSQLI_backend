@@ -46,10 +46,6 @@ async def upload_project(file: UploadFile = File(...)):
     shutil.rmtree(EXTRACTED_DIR, ignore_errors=True)
     os.makedirs(EXTRACTED_DIR, exist_ok=True)
 
-    # Descomprimir
-    with zipfile.ZipFile(file_path, "r") as zip_ref:
-        zip_ref.extractall(EXTRACTED_DIR)
-
     global file_contents, analysis_results, analysis_stats, grafo
     file_contents = {}
     analysis_results = {}
@@ -64,12 +60,7 @@ async def upload_project(file: UploadFile = File(...)):
                     code = f.read()
                     rel_path = os.path.relpath(path, os.path.join(EXTRACTED_DIR, "src")).replace("\\", "/")
                     file_contents[rel_path] = code
-                    print("ARCHIVOS REGISTRADOS EN file_contents:")
-                    for ruta in file_contents:
-                        print(f" - {ruta}")
 
-
-    # Ejecutar el detector real
     resultados, stats, grafo = analizar_proyecto(EXTRACTED_DIR)
     analysis_stats = stats
 
@@ -81,22 +72,25 @@ async def upload_project(file: UploadFile = File(...)):
         }
 
     for alerta in resultados:
-        archivo = os.path.relpath(alerta.get("archivo", "desconocido.java"), EXTRACTED_DIR)
+        archivo = os.path.relpath(alerta.get("archivo", "desconocido.java"), EXTRACTED_DIR).replace("\\", "/")
         if archivo not in analysis_results:
-            analysis_results[archivo] = []
-        analysis_results[archivo].append({
+            analysis_results[archivo] = {
+                "codigo": alerta.get("codigo", ""),
+                "vulnerabilidades": []
+            }
+
+        analysis_results[archivo]["vulnerabilidades"].append({
             "linea": alerta.get("linea", -1),
             "codigo": alerta.get("codigo", ""),
             "detalles": alerta.get("detalles", [])
         })
 
     return {
-    "status": "Proyecto analizado",
-    "archivos": list(file_contents.keys()),
-    "estadisticas": analysis_stats,
-    "resultados": analysis_results  
+        "status": "Proyecto analizado",
+        "archivos": list(file_contents.keys()),
+        "estadisticas": analysis_stats,
+        "resultados": analysis_results
     }
-
 
 
 @app.get("/files")
