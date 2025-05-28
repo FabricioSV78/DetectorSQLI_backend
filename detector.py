@@ -217,8 +217,6 @@ def analizar_proyecto(directorio):
         "lineas afectadas": len(lineas_unicas),
         "tiempo de analisis": round(fin - inicio, 2)
     }
-    guardar_resultados_en_json(resultados)
-    print(f"Análisis terminado. {len(resultados)} fragmentos con alertas.")
     return resultados, estadisticas, grafo
 
 def mostrar_grafo_codigo(grafo):

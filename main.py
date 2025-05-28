@@ -46,6 +46,10 @@ async def upload_project(file: UploadFile = File(...)):
     shutil.rmtree(EXTRACTED_DIR, ignore_errors=True)
     os.makedirs(EXTRACTED_DIR, exist_ok=True)
 
+    # Descomprimir
+    with zipfile.ZipFile(file_path, "r") as zip_ref:
+        zip_ref.extractall(EXTRACTED_DIR)
+
     global file_contents, analysis_results, analysis_stats, grafo
     file_contents = {}
     analysis_results = {}
@@ -58,9 +62,14 @@ async def upload_project(file: UploadFile = File(...)):
                 path = os.path.join(root, name)
                 with open(path, encoding="utf-8", errors="ignore") as f:
                     code = f.read()
-                    rel_path = os.path.relpath(path, os.path.join(EXTRACTED_DIR, "src")).replace("\\", "/")
+                    rel_path = os.path.relpath(path, EXTRACTED_DIR).replace("\\", "/")
                     file_contents[rel_path] = code
+                    print("ARCHIVOS REGISTRADOS EN file_contents:")
+                    for ruta in file_contents:
+                        print(f" - {ruta}")
 
+
+    # Ejecutar el detector real
     resultados, stats, grafo = analizar_proyecto(EXTRACTED_DIR)
     analysis_stats = stats
 
@@ -73,12 +82,13 @@ async def upload_project(file: UploadFile = File(...)):
 
     for alerta in resultados:
         archivo = os.path.relpath(alerta.get("archivo", "desconocido.java"), EXTRACTED_DIR).replace("\\", "/")
+        
         if archivo not in analysis_results:
             analysis_results[archivo] = {
-                "codigo": alerta.get("codigo", ""),
+                "codigo": file_contents.get(archivo, ""),  # Código completo
                 "vulnerabilidades": []
             }
-
+        
         analysis_results[archivo]["vulnerabilidades"].append({
             "linea": alerta.get("linea", -1),
             "codigo": alerta.get("codigo", ""),
@@ -86,11 +96,12 @@ async def upload_project(file: UploadFile = File(...)):
         })
 
     return {
-        "status": "Proyecto analizado",
-        "archivos": list(file_contents.keys()),
-        "estadisticas": analysis_stats,
-        "resultados": analysis_results
-    }
+    "status": "Proyecto analizado",
+    "archivos": list(file_contents.keys()),
+    "estadisticas": analysis_stats,
+    "resultados": analysis_results  
+}
+
 
 
 @app.get("/files")
@@ -107,14 +118,13 @@ async def mostrar_grafo():
 @app.get("/file/{nombre_archivo:path}")
 async def get_file_details(nombre_archivo: str):
     ruta_normalizada = nombre_archivo.replace("\\", "/")
-    if ruta_normalizada not in file_contents:
+    if ruta_normalizada not in analysis_results:
         print(f"NO SE ENCONTRÓ: {ruta_normalizada}")
-        print("DISPONIBLES:", list(file_contents.keys()))
+        print("DISPONIBLES:", list(analysis_results.keys()))
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
-    return {
-        "codigo": file_contents[ruta_normalizada],
-        "vulnerabilidades": analysis_results.get(ruta_normalizada, [])
-    }
+
+    return analysis_results[ruta_normalizada]
+
 
 
 
