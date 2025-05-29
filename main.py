@@ -2,12 +2,13 @@ import os
 import zipfile
 import shutil
 import json
+import re
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 from fpdf import FPDF
 from fastapi.middleware.cors import CORSMiddleware
 from unidecode import unidecode
-from detector import analizar_proyecto, mostrar_grafo_interactivo
+from detector import analizar_proyecto, mostrar_grafo_interactivo, determinar_capa_desde_archivo
 
 
 app = FastAPI()
@@ -57,6 +58,8 @@ async def upload_project(file: UploadFile = File(...)):
     analysis_stats = {}
     grafo = None
 
+    capa_por_archivo = {}
+
     for root, _, files in os.walk(EXTRACTED_DIR):
         for name in files:
             if name.endswith(".java"):
@@ -65,10 +68,24 @@ async def upload_project(file: UploadFile = File(...)):
                     code = f.read()
                     rel_path = os.path.relpath(path, EXTRACTED_DIR).replace("\\", "/")
                     file_contents[rel_path] = code
-                    print("ARCHIVOS REGISTRADOS EN file_contents:")
-                    for ruta in file_contents:
-                        print(f" - {ruta}")
 
+                    # Determinar capa
+                    nombre_paquete = extraer_paquete_java(code)
+                    nombre_clase = os.path.splitext(os.path.basename(rel_path))[0]
+                    capa = determinar_capa_desde_archivo(rel_path, nombre_paquete, nombre_clase)
+                    capa_por_archivo[rel_path] = capa
+
+    # Validar si el proyecto contiene todas las capas necesarias
+    capas_esperadas = {'presentacion', 'logica', 'datos', 'modelo'}
+    capas_detectadas = set(capa_por_archivo.values())
+
+    if not capas_esperadas.issubset(capas_detectadas):
+        return {
+            "status": f"Estructura no válida: faltan capas {capas_esperadas - capas_detectadas}",
+            "archivos": list(file_contents.keys()),
+            "capas_detectadas": dict(capa_por_archivo),
+            "estadisticas": analysis_stats
+        }
 
     # Ejecutar el detector real
     resultados, stats, grafo = analizar_proyecto(EXTRACTED_DIR)
@@ -83,13 +100,13 @@ async def upload_project(file: UploadFile = File(...)):
 
     for alerta in resultados:
         archivo = os.path.relpath(alerta.get("archivo", "desconocido.java"), EXTRACTED_DIR).replace("\\", "/")
-        
+
         if archivo not in analysis_results:
             analysis_results[archivo] = {
                 "codigo": file_contents.get(archivo, ""),  # Código completo
                 "vulnerabilidades": []
             }
-        
+
         analysis_results[archivo]["vulnerabilidades"].append({
             "linea": alerta.get("linea", -1),
             "codigo": alerta.get("codigo", ""),
@@ -97,12 +114,12 @@ async def upload_project(file: UploadFile = File(...)):
         })
 
     return {
-    "status": "Proyecto analizado",
-    "archivos": list(file_contents.keys()),
-    "estadisticas": analysis_stats,
-    "resultados": analysis_results  
-}
-
+        "status": "Proyecto analizado",
+        "archivos": list(file_contents.keys()),
+        "capas_detectadas": dict(capa_por_archivo),
+        "estadisticas": analysis_stats,
+        "resultados": analysis_results
+    }
 
 
 @app.get("/files")
@@ -175,3 +192,7 @@ async def download_report():
 
     pdf.output(PDF_REPORT_PATH)
     return FileResponse(PDF_REPORT_PATH, media_type="application/pdf", filename="reporte_vulnerabilidades.pdf")
+
+def extraer_paquete_java(codigo_fuente):
+    match = re.search(r'^\s*package\s+([\w.]+);', codigo_fuente, re.MULTILINE)
+    return match.group(1) if match else ""

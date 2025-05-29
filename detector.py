@@ -18,15 +18,18 @@ def determinar_capa_desde_archivo(ruta_archivo, nombre_paquete, nombre_clase):
     paquete = nombre_paquete.lower() if nombre_paquete else ""
     clase = nombre_clase.lower() if nombre_clase else ""
 
-    if ('/controller/' in ruta or clase.endswith('controller') or
-        '.controller.' in paquete or '.presentation.' in paquete or '.view.' in paquete or '/application/' in ruta):
+    if ('/presentacion/' in ruta or clase.endswith('controller') or
+        '.controller.' in paquete):
         return 'presentacion'
-    elif ('/service/' in ruta or clase.endswith('service') or
-          '.service.' in paquete or '.business.' in paquete or '.logic.' in paquete or '/businesslayer/' in ruta):
+    elif ('/logica/' in ruta or clase.endswith('service') or
+          '.service.' in paquete):
         return 'logica'
-    elif ('/dao/' in ruta or clase.endswith('dao') or clase.endswith('repository') or
-          '.dao.' in paquete or '.repository.' in paquete or '.data.' in paquete or '/datalayer/' in ruta):
+    elif ('/datos/' in ruta or clase.endswith('dao') or
+          '.dao.' in paquete):
         return 'datos'
+    elif ('/modelo/' in ruta or clase.endswith('entidad') or
+          '.entidad.' in paquete):
+        return 'modelo'
     else:
         return 'desconocida'
 
