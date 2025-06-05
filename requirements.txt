@@ -7,3 +7,8 @@ matplotlib
 pyvis
 python-multipart
 unidecode
+SQLAlchemy
+passlib[bcrypt]
+python-jose
+bcrypt
+psycopg2-binary
