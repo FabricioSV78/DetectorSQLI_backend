@@ -207,54 +207,38 @@ async def get_file_details(nombre_archivo: str):
     return analysis_results[ruta_normalizada]
 
 
-@app.get("/report/download")
-async def download_report():
-    if not analysis_results:
-        raise HTTPException(status_code=404, detail="No hay resultados de análisis")
+@app.get("/report/download/{proyecto_id}")
+def descargar_reporte(proyecto_id: int, db: Session = Depends(get_db)):
+    proyecto = db.query(Proyecto).filter_by(id=proyecto_id).first()
+    if not proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="REPORTE DE VULNERABILIDADES SQLi", ln=True, align='C')
-    pdf.ln(10)
+    archivos = db.query(Archivo).filter_by(proyecto_id=proyecto.id).all()
+    if not archivos:
+        raise HTTPException(status_code=404, detail="No hay archivos analizados")
 
-    # Mostrar primero resumen del análisis
-    if analysis_stats:
-        pdf.set_font("Arial", 'B', 12)
-        pdf.set_fill_color(230, 230, 230)
-        pdf.cell(200, 8, txt="Resumen del análisis", ln=True, fill=True)
-        pdf.set_font("Arial", '', 11)
-        for clave, valor in analysis_stats.items():
-            texto = unidecode(f"{clave}: {valor}")
-            pdf.cell(200, 8, txt=texto, ln=True)
-        pdf.ln(5)
+    resultados = []
+    for archivo in archivos:
+        vulns = db.query(Vulnerabilidad).filter_by(archivo_id=archivo.id).all()
+        for vuln in vulns:
+            resultados.append({
+                "archivo": archivo.nombre,
+                "linea": vuln.linea,
+                "codigo": vuln.fragmento,
+                "detalles": vuln.detalles.split("\n")
+            })
 
-    # Vulnerabilidades por archivo
-    for archivo, contenido in analysis_results.items():
-        pdf.set_font("Arial", 'B', 12)
-        pdf.set_fill_color(200, 220, 255)
-        pdf.cell(200, 8, txt=unidecode(f"Archivo: {archivo}"), ln=True, fill=True)
+    if not resultados:
+        raise HTTPException(status_code=404, detail="No hay vulnerabilidades detectadas")
 
-        registros = contenido.get("vulnerabilidades", [])
-        for entry in registros:
-            pdf.set_font("Arial", 'B', 11)
-            pdf.cell(200, 6, txt=unidecode(f"Línea: {entry['linea']}"), ln=True)
-            pdf.set_font("Arial", 'I', 10)
-            pdf.set_text_color(80)
-            for linea in entry['codigo'].splitlines():
-                pdf.multi_cell(0, 5, unidecode(f"  {linea}"))
-            pdf.set_text_color(0)
-            pdf.set_font("Arial", '', 10)
-            pdf.cell(200, 6, txt="Detalles:", ln=True)
-            for detalle in entry.get("detalles", []):
-                limpio = unidecode(detalle.replace("→", "->"))
-                pdf.multi_cell(0, 6, f"    - {limpio}")
-            pdf.ln(4)
-        pdf.ln(5)
+    stats = {
+        "Archivos analizados": len(archivos),
+        "Vulnerabilidades encontradas": len(resultados)
+    }
 
-    pdf.output(PDF_REPORT_PATH)
-    return FileResponse(PDF_REPORT_PATH, media_type="application/pdf", filename="reporte_vulnerabilidades.pdf")
+    ruta_pdf = f"reporte_{proyecto_id}.pdf"
+    generar_pdf_reporte(resultados, stats, output_path=ruta_pdf)
+    return FileResponse(ruta_pdf, media_type="application/pdf", filename="reporte_vulnerabilidades.pdf")
 
 def extraer_paquete_java(codigo_fuente):
     match = re.search(r'^\s*package\s+([\w.]+);', codigo_fuente, re.MULTILINE)

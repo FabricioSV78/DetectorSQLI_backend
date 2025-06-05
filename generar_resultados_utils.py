@@ -44,7 +44,6 @@ def generar_heatmap_por_archivo(resultados, output_path="heatmap.png"):
     plt.close()
 
 
-
 def generar_pdf_reporte(resultados, stats, output_path="reporte.pdf"):
     pdf = FPDF()
     pdf.add_page()
