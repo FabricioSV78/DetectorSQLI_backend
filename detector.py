@@ -164,7 +164,9 @@ class SQLiDetector(JavaParserListener):
         self.codigo_fuente[linea] = fragmento
 
     def _alert(self, linea, nivel, tipo, detalle):
-        clave = f"{self.archivo_actual}:{linea}-{tipo}"
+        mensaje_str = detalle if isinstance(detalle, str) else "|".join(detalle)
+        clave = f"{self.archivo_actual}:{linea}-{tipo}-{mensaje_str}"
+
         if clave in self.alertas_emitidas:
             return
         self.alertas_emitidas.add(clave)
@@ -175,7 +177,7 @@ class SQLiDetector(JavaParserListener):
                 nodo_var = f"{metodo_id}.{var}"
                 if self.grafo_codigo.has_node(nodo_var):
                     self.grafo_codigo.nodes[nodo_var]["riesgoso"] = True
-                # Verificar si la vulnerabilidad llega hasta la capa de datos
+
                 if self.grafo_codigo.has_node(metodo_id):
                     if self.hay_camino_hacia_datos(metodo_id, self.grafo_codigo):
                         self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
@@ -192,9 +194,13 @@ class SQLiDetector(JavaParserListener):
             "linea": linea,
             "codigo": self.codigo_fuente.get(linea, ""),
             "archivo": self.archivo_actual,
-            "detalle": detalle
+            "detalles": detalle if isinstance(detalle, list) else [detalle]
         }
+
+        if linea not in self.alertas_por_linea:
+            self.alertas_por_linea[linea] = []
         self.alertas_por_linea[linea].append(alerta)
+
 
     def hay_camino_hacia_datos(self, metodo_inicio, grafo):
         """
