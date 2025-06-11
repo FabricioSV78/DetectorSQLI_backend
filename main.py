@@ -126,26 +126,43 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
     nuevo_proyecto.path_pdf = path_pdf
     db.commit()
 
-    # Guardar archivos y vulnerabilidades
+    # Agrupar vulnerabilidades por archivo y línea
+    agrupadas_por_archivo = {}
+
     for alerta in resultados:
         archivo = os.path.relpath(alerta.get("archivo", "desconocido.java"), extracted_path).replace("\\", "/")
-        codigo = file_contents.get(archivo, "")
+        linea = alerta.get("linea", -1)
+        fragmento = alerta.get("codigo", "")
+        detalles = alerta.get("detalles", [])
 
+        if archivo not in agrupadas_por_archivo:
+            agrupadas_por_archivo[archivo] = {}
+
+        if linea in agrupadas_por_archivo[archivo]:
+            agrupadas_por_archivo[archivo][linea]["detalles"].extend([d for d in detalles if d not in agrupadas_por_archivo[archivo][linea]["detalles"]])
+        else:
+            agrupadas_por_archivo[archivo][linea] = {
+                "fragmento": fragmento,
+                "detalles": detalles
+            }
+
+    for archivo, lineas in agrupadas_por_archivo.items():
+        codigo = file_contents.get(archivo, "")
         archivo_bd = Archivo(nombre=archivo, codigo_fuente=codigo, proyecto_id=proyecto_id)
         db.add(archivo_bd)
         db.commit()
         db.refresh(archivo_bd)
 
-        for detalle in alerta.get("detalles", []):
+        for linea, info in lineas.items():
             db.add(Vulnerabilidad(
-                linea=alerta.get("linea", -1),
-                fragmento=alerta.get("codigo", ""),
-                detalles="\n".join(alerta.get("detalles", [])),
+                linea=linea,
+                fragmento=info["fragmento"],
+                detalles="\n".join(info["detalles"]),
                 archivo_id=archivo_bd.id
             ))
     db.commit()
 
-    # Limpieza opcional
+    # Limpieza 
     os.remove(file_path)
     shutil.rmtree(extracted_path, ignore_errors=True)
 
