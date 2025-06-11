@@ -179,8 +179,11 @@ class SQLiDetector(JavaParserListener):
                 if self.grafo_codigo.has_node(metodo_id):
                     if self.hay_camino_hacia_datos(metodo_id, self.grafo_codigo):
                         self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
+                    elif self.capa_actual in ["logica", "presentacion"]:
+                        print(f"[DETECTADO EN {self.capa_actual.upper()}] {metodo_id} ejecuta SQL directamente.")
+                        self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
                     else:
-                        print(f"[IGNORADO - No llega a datos] {metodo_id}")
+                        print(f"[IGNORADO - No llega a datos y no está en capa lógica/presentación] {metodo_id}")
                         return
 
         alerta = {
