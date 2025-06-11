@@ -164,9 +164,9 @@ class SQLiDetector(JavaParserListener):
                 if self.grafo_codigo.has_node(metodo_id):
                     if self.hay_camino_hacia_datos(metodo_id, self.grafo_codigo):
                         self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
-                    else:
-                        print(f"[IGNORADO - No llega a datos] {metodo_id}")
-                        return
+                    #else:
+                       # print(f"[IGNORADO - No llega a datos] {metodo_id}")
+                        #return
 
         alerta = {
             "nivel": nivel,
