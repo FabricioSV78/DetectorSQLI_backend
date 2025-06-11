@@ -146,20 +146,21 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
             })
 
 
-    for archivo, lineas in agrupadas_por_archivo.items():
+    for archivo, vulnerabilidades in agrupadas_por_archivo.items():
         codigo = file_contents.get(archivo, "")
         archivo_bd = Archivo(nombre=archivo, codigo_fuente=codigo, proyecto_id=proyecto_id)
         db.add(archivo_bd)
         db.commit()
         db.refresh(archivo_bd)
 
-        for linea, info in lineas.items():
+        for vuln in vulnerabilidades:
             db.add(Vulnerabilidad(
-                linea=linea,
-                fragmento=info["fragmento"],
-                detalles="\n".join(info["detalles"]),
+                linea=vuln["linea"],
+                fragmento=vuln["fragmento"],
+                detalles="\n".join(vuln["detalles"]),
                 archivo_id=archivo_bd.id
-            ))
+        ))
+
     db.commit()
 
     # Limpieza 
