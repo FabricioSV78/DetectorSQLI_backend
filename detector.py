@@ -275,7 +275,11 @@ def analizar_proyecto(directorio):
                             "archivo": alertas[0]["archivo"],
                             "linea": alertas[0]["linea"],
                             "codigo": alertas[0]["codigo"],
-                            "detalles": [f"[{a['nivel']}] {a['tipo']}: {a['detalles']}" for a in alertas]
+                            "detalles": [
+                                f"[{a['nivel']}] {a['tipo']}: {mensaje}"
+                                for a in alertas
+                                for mensaje in (a["detalles"] if isinstance(a["detalles"], list) else [a["detalles"]])
+                            ]
                         })
                         lineas_unicas.add((alertas[0]["archivo"], alertas[0]["linea"]))
                         grafo.update(detector.grafo_codigo)
