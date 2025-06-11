@@ -198,6 +198,12 @@ class SQLiDetector(JavaParserListener):
         Verifica si desde un método riesgoso se alcanza alguna clase de la capa de datos (DAO).
         Requiere estructura válida N-capas.
         """
+        # si el método ya pertenece a una clase DAO, no necesitamos buscar ruta
+        nombre_clase = metodo_inicio.split(".")[0]
+        if self._es_capa_datos(nombre_clase):
+            print(f"[BACKTRACKING] {metodo_inicio} ya pertenece a clase DAO → válido")
+            return True
+
         if metodo_inicio not in grafo.nodes:
             print(f"[BACKTRACKING TEST] Desde: {metodo_inicio}")
             print(f"[CLASES DESTINO POSIBLES]: {[n for n in grafo.nodes if '.' not in n and self._es_capa_datos(n)]}")
