@@ -122,6 +122,21 @@ class SQLiDetector(JavaParserListener):
         linea = ctx.start.line
         self._capturar_fragmento_codigo(linea)
 
+        # detectamos llamadas a otros métodos 
+        match = re.search(r'(\w+)\.(\w+)\((.*?)\)', texto)
+        if match:
+            instancia, metodo_llamado, _ = match.groups()
+            clase_origen = self.clase_actual
+            metodo_origen = self.metodo_actual
+            metodo_id_origen = f"{clase_origen}.{metodo_origen}"
+            clase_destino = instancia[0].upper() + instancia[1:] 
+            metodo_id_destino = f"{clase_destino}.{metodo_llamado}"
+
+            self.grafo_codigo.add_node(metodo_id_destino, tipo="metodo")
+            self.grafo_codigo.add_edge(metodo_id_origen, metodo_id_destino)
+            print(f"[ENLACE] {metodo_id_origen} -> {metodo_id_destino}")
+
+
         contiene_sql = any(sql in texto_up for sql in PALABRAS_SQL) and ('"' in texto or "'" in texto)
 
         for var in self.variables_riesgosas:
@@ -164,9 +179,9 @@ class SQLiDetector(JavaParserListener):
                 if self.grafo_codigo.has_node(metodo_id):
                     if self.hay_camino_hacia_datos(metodo_id, self.grafo_codigo):
                         self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
-                    #else:
-                       # print(f"[IGNORADO - No llega a datos] {metodo_id}")
-                        #return
+                    else:
+                        print(f"[IGNORADO - No llega a datos] {metodo_id}")
+                        return
 
         alerta = {
             "nivel": nivel,
@@ -289,21 +304,6 @@ def mostrar_grafo_codigo(grafo):
             edge_color='gray')
     plt.title("Grafo de flujo estructural del código Java (nodos riesgosos en rojo)")
     plt.show()
-
-"""def mostrar_grafo_interactivo(grafo):
-    net = Network(height="800px", width="100%", notebook=False, directed=True)
-    for nodo, data in grafo.nodes(data=True):
-        color = "red" if data.get("riesgoso") else {
-            "clase": "lightgreen",
-            "metodo": "skyblue",
-            "parametro": "orange",
-            "variable": "mediumseagreen"
-        }.get(data.get("tipo"), "lightgray")
-        net.add_node(nodo, label=nodo, color=color)
-    for origen, destino in grafo.edges():
-        net.add_edge(origen, destino)
-
-    net.write_html("grafo_interactivo.html", open_browser=True)"""
 
 def mostrar_resultados(resultados, estadisticas):
     print("\n=== RESULTADOS DEL ANÁLISIS ===")
