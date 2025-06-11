@@ -138,13 +138,21 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
         if archivo not in agrupadas_por_archivo:
             agrupadas_por_archivo[archivo] = {}
 
-        if linea in agrupadas_por_archivo[archivo]:
-            agrupadas_por_archivo[archivo][linea]["detalles"].extend([d for d in detalles if d not in agrupadas_por_archivo[archivo][linea]["detalles"]])
-        else:
+        # Buscar si ya hay una línea con el mismo fragmento
+        ya_existe = False
+        for l, info in agrupadas_por_archivo[archivo].items():
+            if info["fragmento"].strip() == fragmento.strip():
+                # Fusionar los detalles sin duplicar
+                info["detalles"].extend([d for d in detalles if d not in info["detalles"]])
+                ya_existe = True
+                break
+
+        if not ya_existe:
             agrupadas_por_archivo[archivo][linea] = {
                 "fragmento": fragmento,
                 "detalles": detalles
             }
+
 
     for archivo, lineas in agrupadas_por_archivo.items():
         codigo = file_contents.get(archivo, "")
