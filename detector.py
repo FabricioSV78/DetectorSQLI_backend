@@ -163,8 +163,8 @@ class SQLiDetector(JavaParserListener):
         fragmento = "".join(self.codigo_fuente_lineas[inicio:fin]).strip()
         self.codigo_fuente[linea] = fragmento
 
-    def _alert(self, linea, nivel, tipo, detalle):
-        mensaje_str = detalle if isinstance(detalle, str) else "|".join(detalle)
+    def _alert(self, linea, nivel, tipo, detalles):
+        mensaje_str = detalles if isinstance(detalles, str) else "|".join(detalles)
         clave = f"{self.archivo_actual}:{linea}-{tipo}-{mensaje_str}"
 
         if clave in self.alertas_emitidas:
@@ -194,8 +194,9 @@ class SQLiDetector(JavaParserListener):
             "linea": linea,
             "codigo": self.codigo_fuente.get(linea, ""),
             "archivo": self.archivo_actual,
-            "detalles": detalle if isinstance(detalle, list) else [detalle]
+            "detalles": detalles if isinstance(detalles, list) else [detalles]
         }
+
 
         if linea not in self.alertas_por_linea:
             self.alertas_por_linea[linea] = []
