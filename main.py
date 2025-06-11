@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fpdf import FPDF
 from fastapi.middleware.cors import CORSMiddleware
 from unidecode import unidecode
-from detector import analizar_proyecto, mostrar_grafo_interactivo, determinar_capa_desde_archivo
+from detector import analizar_proyecto, determinar_capa_desde_archivo
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use("Agg")
@@ -35,19 +35,10 @@ app.add_middleware(
 UPLOAD_DIR = "uploaded"
 EXTRACTED_DIR = "project"
 PDF_REPORT_PATH = "reporte_final.pdf"
-RESULTADOS_JSON = "resultados.json"
-
-file_contents = {}
-analysis_results = {}
-analysis_stats = {}
-grafo = None  
-
-
-
-UPLOAD_DIR = "uploaded"
-EXTRACTED_DIR = "project"
 RESULTS_DIR = "resultados"
 os.makedirs(RESULTS_DIR, exist_ok=True)
+
+from uuid import uuid4
 
 @app.post("/upload")
 async def upload_project(file: UploadFile = File(...), db: Session = Depends(get_db), usuario=Depends(obtener_usuario_desde_token)):
@@ -60,23 +51,24 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Extraer ZIP
-    shutil.rmtree(EXTRACTED_DIR, ignore_errors=True)
-    os.makedirs(EXTRACTED_DIR, exist_ok=True)
+    # Extraer ZIP a carpeta única por proyecto
+    proyecto_uuid = str(uuid4())
+    extracted_path = os.path.join(EXTRACTED_DIR, proyecto_uuid)
+    os.makedirs(extracted_path, exist_ok=True)
     with zipfile.ZipFile(file_path, "r") as zip_ref:
-        zip_ref.extractall(EXTRACTED_DIR)
+        zip_ref.extractall(extracted_path)
 
     # Procesar archivos
     file_contents = {}
     capa_por_archivo = {}
 
-    for root, _, files in os.walk(EXTRACTED_DIR):
+    for root, _, files in os.walk(extracted_path):
         for name in files:
             if name.endswith(".java"):
                 path = os.path.join(root, name)
                 with open(path, encoding="utf-8", errors="ignore") as f:
                     code = f.read()
-                    rel_path = os.path.relpath(path, EXTRACTED_DIR).replace("\\", "/")
+                    rel_path = os.path.relpath(path, extracted_path).replace("\\", "/")
                     file_contents[rel_path] = code
 
                     paquete = extraer_paquete_java(code)
@@ -95,17 +87,17 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
         }
 
     # Analizar el proyecto
-    resultados, stats, grafo = analizar_proyecto(EXTRACTED_DIR)
+    resultados, stats, grafo = analizar_proyecto(extracted_path)
     if grafo is None or grafo.number_of_nodes() == 0:
         return {
             "status": "Estructura no válida: el proyecto no contiene clases válidas",
             "archivos": list(file_contents.keys())
         }
 
-    # Crear registro del proyecto en BD
+    # Crear proyecto en base de datos
     nuevo_proyecto = Proyecto(
         nombre=file.filename,
-        usuario_id = usuario.id,
+        usuario_id=usuario.id,
         path_grafo="",
         path_heatmap="",
         path_pdf=""
@@ -123,63 +115,56 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
     path_heatmap = os.path.join(RESULTS_DIR, nombre_heatmap)
     path_pdf = os.path.join(RESULTS_DIR, nombre_pdf)
 
-    # Generar archivos
+    # Generar archivos visuales
     mostrar_grafo_interactivo(grafo, output_path=path_grafo)
     generar_heatmap_por_archivo(resultados, output_path=path_heatmap)
     generar_pdf_reporte(resultados, stats, output_path=path_pdf)
 
-    # Guardar rutas en el proyecto
+    # Actualizar rutas en proyecto
     nuevo_proyecto.path_grafo = path_grafo
     nuevo_proyecto.path_heatmap = path_heatmap
     nuevo_proyecto.path_pdf = path_pdf
     db.commit()
 
     # Guardar archivos y vulnerabilidades
-    analysis_results = {}
     for alerta in resultados:
-        archivo = os.path.relpath(alerta.get("archivo", "desconocido.java"), EXTRACTED_DIR).replace("\\", "/")
+        archivo = os.path.relpath(alerta.get("archivo", "desconocido.java"), extracted_path).replace("\\", "/")
+        codigo = file_contents.get(archivo, "")
 
-        if archivo not in analysis_results:
-            analysis_results[archivo] = {
-                "codigo": file_contents.get(archivo, ""),
-                "vulnerabilidades": []
-            }
-
-        analysis_results[archivo]["vulnerabilidades"].append({
-            "linea": alerta.get("linea", -1),
-            "codigo": alerta.get("codigo", ""),
-            "detalles": alerta.get("detalles", [])
-        })
-
-    for archivo, contenido in analysis_results.items():
-        archivo_bd = Archivo(nombre=archivo, codigo_fuente=contenido["codigo"], proyecto_id=proyecto_id)
+        archivo_bd = Archivo(nombre=archivo, codigo_fuente=codigo, proyecto_id=proyecto_id)
         db.add(archivo_bd)
         db.commit()
         db.refresh(archivo_bd)
 
-        for vuln in contenido["vulnerabilidades"]:
+        for detalle in alerta.get("detalles", []):
             db.add(Vulnerabilidad(
-                linea=vuln["linea"],
-                fragmento=vuln["codigo"],
-                detalles="\n".join(vuln["detalles"]),
+                linea=alerta.get("linea", -1),
+                fragmento=alerta.get("codigo", ""),
+                detalles="\n".join(alerta.get("detalles", [])),
                 archivo_id=archivo_bd.id
             ))
     db.commit()
+
+    # Limpieza opcional
+    os.remove(file_path)
+    shutil.rmtree(extracted_path, ignore_errors=True)
 
     return {
         "status": "Proyecto analizado y guardado",
         "proyecto_id": proyecto_id,
         "archivos": list(file_contents.keys()),
         "capas_detectadas": dict(capa_por_archivo),
-        "estadisticas": stats,
-        "resultados": analysis_results
+        "estadisticas": stats
     }
 
+@app.get("/files/{proyecto_id}")
+def list_files(proyecto_id: int, db: Session = Depends(get_db), usuario=Depends(obtener_usuario_desde_token)):
+    archivos = db.query(Archivo).filter_by(proyecto_id=proyecto_id).all()
+    if not archivos:
+        raise HTTPException(status_code=404, detail="No se encontraron archivos para este proyecto")
+    
+    return [archivo.nombre for archivo in archivos]
 
-
-@app.get("/files")
-async def list_files():
-    return list(file_contents.keys())
 
 @app.get("/grafo/{proyecto_id}")
 def grafo_html(
@@ -196,15 +181,25 @@ def grafo_html(
 
 
 
-@app.get("/file/{nombre_archivo:path}")
-async def get_file_details(nombre_archivo: str):
-    ruta_normalizada = nombre_archivo.replace("\\", "/")
-    if ruta_normalizada not in analysis_results:
-        print(f"NO SE ENCONTRÓ: {ruta_normalizada}")
-        print("DISPONIBLES:", list(analysis_results.keys()))
+@app.get("/file/{proyecto_id}/{nombre_archivo:path}")
+def get_file_details(proyecto_id: int, nombre_archivo: str, db: Session = Depends(get_db), usuario=Depends(obtener_usuario_desde_token)):
+    archivo = db.query(Archivo).filter_by(nombre=nombre_archivo, proyecto_id=proyecto_id).first()
+    if not archivo:
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
-    return analysis_results[ruta_normalizada]
+    vulns = db.query(Vulnerabilidad).filter_by(archivo_id=archivo.id).all()
+    return {
+        "codigo": archivo.codigo_fuente,
+        "vulnerabilidades": [
+            {
+                "linea": v.linea,
+                "codigo": v.fragmento,
+                "detalles": v.detalles.split("\n")
+            }
+            for v in vulns
+        ]
+    }
+
 
 
 @app.get("/report/download/{proyecto_id}")

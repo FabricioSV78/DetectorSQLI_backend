@@ -149,7 +149,7 @@ class SQLiDetector(JavaParserListener):
         self.codigo_fuente[linea] = fragmento
 
     def _alert(self, linea, nivel, tipo, detalle):
-        clave = f"{linea}-{tipo}"
+        clave = f"{self.archivo_actual}:{linea}-{tipo}"
         if clave in self.alertas_emitidas:
             return
         self.alertas_emitidas.add(clave)
@@ -160,8 +160,13 @@ class SQLiDetector(JavaParserListener):
                 nodo_var = f"{metodo_id}.{var}"
                 if self.grafo_codigo.has_node(nodo_var):
                     self.grafo_codigo.nodes[nodo_var]["riesgoso"] = True
+                # Verificar si la vulnerabilidad llega hasta la capa de datos
                 if self.grafo_codigo.has_node(metodo_id):
-                    self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
+                    if self.hay_camino_hacia_datos(metodo_id, self.grafo_codigo):
+                        self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
+                    else:
+                        print(f"[IGNORADO - No llega a datos] {metodo_id}")
+                        return
 
         alerta = {
             "nivel": nivel,
@@ -173,10 +178,45 @@ class SQLiDetector(JavaParserListener):
         }
         self.alertas_por_linea[linea].append(alerta)
 
+    def hay_camino_hacia_datos(self, metodo_inicio, grafo):
+        """
+        Verifica si desde un método riesgoso se alcanza alguna clase de la capa de datos (DAO).
+        Requiere estructura válida N-capas.
+        """
+        if metodo_inicio not in grafo.nodes:
+            return False
+        try:
+            for nodo in grafo.nodes:
+                # Validamos que sea un nodo de clase (no tiene punto)
+                if isinstance(nodo, str) and '.' not in nodo:
+                    atributos = grafo.nodes[nodo]
+                    if atributos.get("tipo") == "clase" and self._es_capa_datos(nodo):
+                        if nx.has_path(grafo, metodo_inicio, nodo):
+                            return True
+            return False
+        except Exception as e:
+            print(f"[ERROR backtracking]: {e}")
+            return False
+
+
+    def _es_capa_datos(self, nombre_clase):
+        """
+        Determina si el nombre de clase corresponde a la capa 'datos' según la convención.
+        Se considera válido si el nombre termina en DAO o contiene 'datos' en su ruta.
+        """
+        nombre = nombre_clase.lower()
+        return (
+            nombre.endswith("dao") or
+            ".dao." in nombre or
+            "datos" in nombre  # respaldo en caso de ruta
+        )
+
+
+
 # --------------------------- ANALIZADOR DE PROYECTO ---------------------------
-def guardar_resultados_en_json(resultados, path="resultados.json"):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(resultados, f, indent=2, ensure_ascii=False)
+#def guardar_resultados_en_json(resultados, path="resultados.json"):
+   # with open(path, "w", encoding="utf-8") as f:
+       # json.dump(resultados, f, indent=2, ensure_ascii=False)
 
 def analizar_proyecto(directorio):
     resultados = []
@@ -250,7 +290,7 @@ def mostrar_grafo_codigo(grafo):
     plt.title("Grafo de flujo estructural del código Java (nodos riesgosos en rojo)")
     plt.show()
 
-def mostrar_grafo_interactivo(grafo):
+"""def mostrar_grafo_interactivo(grafo):
     net = Network(height="800px", width="100%", notebook=False, directed=True)
     for nodo, data in grafo.nodes(data=True):
         color = "red" if data.get("riesgoso") else {
@@ -263,7 +303,7 @@ def mostrar_grafo_interactivo(grafo):
     for origen, destino in grafo.edges():
         net.add_edge(origen, destino)
 
-    net.write_html("grafo_interactivo.html", open_browser=True)
+    net.write_html("grafo_interactivo.html", open_browser=True)"""
 
 def mostrar_resultados(resultados, estadisticas):
     print("\n=== RESULTADOS DEL ANÁLISIS ===")
