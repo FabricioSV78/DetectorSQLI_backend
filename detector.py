@@ -199,6 +199,8 @@ class SQLiDetector(JavaParserListener):
         Requiere estructura válida N-capas.
         """
         if metodo_inicio not in grafo.nodes:
+            print(f"[BACKTRACKING TEST] Desde: {metodo_inicio}")
+            print(f"[CLASES DESTINO POSIBLES]: {[n for n in grafo.nodes if '.' not in n and self._es_capa_datos(n)]}")
             return False
         try:
             for nodo in grafo.nodes:
@@ -223,7 +225,7 @@ class SQLiDetector(JavaParserListener):
         return (
             nombre.endswith("dao") or
             ".dao." in nombre or
-            "datos" in nombre  # respaldo en caso de ruta
+            "datos" in nombre  
         )
 
 
@@ -327,11 +329,3 @@ def mostrar_resultados(resultados, estadisticas):
     if 'clases fuera de estándar' in estadisticas:
         print(f"Clases fuera de estándar : {estadisticas['clases fuera de estándar']}")
 
-
-# --------------------------- EJEMPLO DE USO ---------------------------
-
-if __name__ == "__main__":
-    carpeta = input("Ingrese la ruta de su proyecto Java: ").strip()
-    alertas, stats, grafo = analizar_proyecto(carpeta)
-    mostrar_resultados(alertas, stats)
-    mostrar_grafo_interactivo(grafo)
