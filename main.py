@@ -139,7 +139,9 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
             agrupadas_por_archivo[archivo] = {}
 
         if linea in agrupadas_por_archivo[archivo]:
-            agrupadas_por_archivo[archivo][linea]["detalles"].extend([d for d in detalles if d not in agrupadas_por_archivo[archivo][linea]["detalles"]])
+            agrupadas_por_archivo[archivo][linea]["detalles"].extend(detalles)
+            agrupadas_por_archivo[archivo][linea]["detalles"] = list(set(agrupadas_por_archivo[archivo][linea]["detalles"]))
+
         else:
             agrupadas_por_archivo[archivo][linea] = {
                 "fragmento": fragmento,
