@@ -136,31 +136,30 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
         detalles = alerta.get("detalles", [])
 
         if archivo not in agrupadas_por_archivo:
-            agrupadas_por_archivo[archivo] = []
+            agrupadas_por_archivo[archivo] = {}
 
-        for mensaje in detalles:
-            agrupadas_por_archivo[archivo].append({
-                "linea": linea,
+        if linea in agrupadas_por_archivo[archivo]:
+            agrupadas_por_archivo[archivo][linea]["detalles"].extend([d for d in detalles if d not in agrupadas_por_archivo[archivo][linea]["detalles"]])
+        else:
+            agrupadas_por_archivo[archivo][linea] = {
                 "fragmento": fragmento,
-                "detalles": [mensaje]  
-            })
+                "detalles": detalles
+            }
 
-
-    for archivo, vulnerabilidades in agrupadas_por_archivo.items():
+    for archivo, lineas in agrupadas_por_archivo.items():
         codigo = file_contents.get(archivo, "")
         archivo_bd = Archivo(nombre=archivo, codigo_fuente=codigo, proyecto_id=proyecto_id)
         db.add(archivo_bd)
         db.commit()
         db.refresh(archivo_bd)
 
-        for vuln in vulnerabilidades:
+        for linea, info in lineas.items():
             db.add(Vulnerabilidad(
-                linea=vuln["linea"],
-                fragmento=vuln["fragmento"],
-                detalles="\n".join(vuln["detalles"]),
+                linea=linea,
+                fragmento=info["fragmento"],
+                detalles="\n".join(info["detalles"]),
                 archivo_id=archivo_bd.id
-        ))
-
+            ))
     db.commit()
 
     # Limpieza 
