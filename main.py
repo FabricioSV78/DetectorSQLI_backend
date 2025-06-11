@@ -136,17 +136,15 @@ async def upload_project(file: UploadFile = File(...), db: Session = Depends(get
         detalles = alerta.get("detalles", [])
 
         if archivo not in agrupadas_por_archivo:
-            agrupadas_por_archivo[archivo] = {}
+            agrupadas_por_archivo[archivo] = []
 
-        if linea in agrupadas_por_archivo[archivo]:
-            agrupadas_por_archivo[archivo][linea]["detalles"].extend(detalles)
-            agrupadas_por_archivo[archivo][linea]["detalles"] = list(set(agrupadas_por_archivo[archivo][linea]["detalles"]))
-
-        else:
-            agrupadas_por_archivo[archivo][linea] = {
+        for mensaje in detalles:
+            agrupadas_por_archivo[archivo].append({
+                "linea": linea,
                 "fragmento": fragmento,
-                "detalles": detalles
-            }
+                "detalles": [mensaje]  
+            })
+
 
     for archivo, lineas in agrupadas_por_archivo.items():
         codigo = file_contents.get(archivo, "")
