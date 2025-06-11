@@ -166,7 +166,6 @@ class SQLiDetector(JavaParserListener):
     def _alert(self, linea, nivel, tipo, detalles):
         mensaje_str = detalles if isinstance(detalles, str) else "|".join(detalles)
         clave = f"{self.archivo_actual}:{linea}-{tipo}-{mensaje_str}"
-
         if clave in self.alertas_emitidas:
             return
         self.alertas_emitidas.add(clave)
@@ -177,7 +176,7 @@ class SQLiDetector(JavaParserListener):
                 nodo_var = f"{metodo_id}.{var}"
                 if self.grafo_codigo.has_node(nodo_var):
                     self.grafo_codigo.nodes[nodo_var]["riesgoso"] = True
-
+                # Verificar si la vulnerabilidad llega hasta la capa de datos
                 if self.grafo_codigo.has_node(metodo_id):
                     if self.hay_camino_hacia_datos(metodo_id, self.grafo_codigo):
                         self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
@@ -188,19 +187,18 @@ class SQLiDetector(JavaParserListener):
                         print(f"[IGNORADO - No llega a datos y no está en capa lógica/presentación] {metodo_id}")
                         return
 
+
         alerta = {
             "nivel": nivel,
             "tipo": tipo,
             "linea": linea,
             "codigo": self.codigo_fuente.get(linea, ""),
             "archivo": self.archivo_actual,
-            "detalles": detalles if isinstance(detalles, list) else [detalles]
+            "detalles": detalles
         }
-
-        if linea not in self.alertas_por_linea:
-            self.alertas_por_linea[linea] = []
         self.alertas_por_linea[linea].append(alerta)
 
+    def hay_camino_hacia_datos(self, metodo_inicio, grafo):
         """
         Verifica si desde un método riesgoso se alcanza alguna clase de la capa de datos (DAO).
         Requiere estructura válida N-capas.
