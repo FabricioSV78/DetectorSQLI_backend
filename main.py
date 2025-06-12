@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from db import get_db
 from modelos import Proyecto, Archivo, Vulnerabilidad
 from generar_resultados_utils import mostrar_grafo_interactivo, generar_heatmap_por_archivo, generar_pdf_reporte 
+from collections import Counter
 
 app = FastAPI()
 
@@ -250,6 +251,13 @@ def descargar_reporte(proyecto_id: int, db: Session = Depends(get_db)):
 
     if not resultados:
         raise HTTPException(status_code=404, detail="No hay vulnerabilidades detectadas")
+    
+    tipo_counter = Counter()
+    for r in resultados:
+        for detalle in r.get("detalles", []):
+            linea = detalle.strip().replace(":", ":")
+            tipo = linea.split(":")[0].strip()
+            tipo_counter[tipo] += 1
 
     stats = {
         "Archivos analizados": len(archivos),
@@ -257,7 +265,9 @@ def descargar_reporte(proyecto_id: int, db: Session = Depends(get_db)):
     }
 
     ruta_pdf = f"reporte_{proyecto_id}.pdf"
-    generar_pdf_reporte(resultados, stats, output_path=ruta_pdf)
+
+    generar_pdf_reporte(resultados, stats, tipo_counter=tipo_counter, output_path=ruta_pdf)
+
     return FileResponse(ruta_pdf, media_type="application/pdf", filename="reporte_vulnerabilidades.pdf")
 
 def extraer_paquete_java(codigo_fuente):
@@ -270,7 +280,6 @@ def generar_line_heatmap(
     usuario=Depends(obtener_usuario_desde_token),
     db: Session = Depends(get_db)
 ):
-    # Verificar que el proyecto le pertenece al usuario
     proyecto = db.query(Proyecto).filter_by(id=proyecto_id, usuario_id=usuario.id).first()
     if not proyecto:
         raise HTTPException(status_code=403, detail="Proyecto no encontrado o no autorizado")
@@ -279,60 +288,52 @@ def generar_line_heatmap(
     if not archivos:
         raise HTTPException(status_code=404, detail="No hay archivos para este proyecto")
 
-    heatmap_data = []
-    archivos_nombres = []
-    max_bin = 0
-    bin_size = 10
+    x_total_lineas = []
+    y_porcentaje_vulnerables = []
 
     for archivo in archivos:
+        total_lineas = archivo.codigo_fuente.count("\n")
         vulns = db.query(Vulnerabilidad).filter_by(archivo_id=archivo.id).all()
-        lineas = [v.linea for v in vulns if v.linea is not None]
+        lineas_vulnerables = len(vulns)
 
-        if not lineas:
-            continue
+        if total_lineas > 0:
+            porcentaje = (lineas_vulnerables / total_lineas) * 100
+            x_total_lineas.append(total_lineas)
+            y_porcentaje_vulnerables.append(porcentaje)
 
-        bins = {}
-        for linea in lineas:
-            b = linea // bin_size
-            bins[b] = bins.get(b, 0) + 1
-            max_bin = max(max_bin, b)
-
-        fila = [bins.get(i, 0) for i in range(max_bin + 1)]
-        heatmap_data.append(fila)
-        archivos_nombres.append(os.path.basename(archivo.nombre))
-
-    if not heatmap_data:
+    if not x_total_lineas or not y_porcentaje_vulnerables:
         raise HTTPException(status_code=404, detail="No hay datos para graficar")
 
-    # Normalizar todas las filas al mismo largo
-    for fila in heatmap_data:
-        fila.extend([0] * (max_bin + 1 - len(fila)))
+    # Crear figura
+    plt.figure(figsize=(10, 8))
+    sns.set(style="whitegrid")
 
-    heat_data = np.array(heatmap_data)
-    xticks = [f"{i*bin_size}-{(i+1)*bin_size - 1}" for i in range(max_bin + 1)]
-
-    plt.figure(figsize=(max(12, len(xticks) * 0.8), len(archivos_nombres) * 1.2))
-    sns.set(font_scale=0.9)
-    ax = sns.heatmap(
-        heat_data,
-        cmap="Reds",
-        cbar=True,
-        xticklabels=xticks,
-        yticklabels=archivos_nombres,
-        linewidths=0.3,
-        linecolor="gray"
+    # Crear histograma 2D: líneas totales vs % de vulnerabilidad
+    heatmap, xedges, yedges, img = plt.hist2d(
+        x_total_lineas,
+        y_porcentaje_vulnerables,
+        bins=[20, 20],
+        cmap="YlOrRd"
     )
-    ax.set_xlabel("Bloques de líneas de código")
-    ax.set_ylabel("Archivo")
-    ax.set_title("Mapa de Calor por Bloques de Líneas (agrupado cada 10 líneas)")
+
+    # Dibujar líneas de cuadrícula
+    for x in xedges:
+        plt.axvline(x, color='gray', linewidth=0.5, linestyle='--')
+    for y in yedges:
+        plt.axhline(y, color='gray', linewidth=0.5, linestyle='--')
+
+    # Etiquetas
+    plt.colorbar(label="Cantidad de Archivos")
+    plt.xlabel("Líneas totales por archivo")
+    plt.ylabel("Porcentaje de líneas vulnerables (%)")
+    plt.title("Mapa de Calor: Total de líneas vs % de vulnerabilidad")
     plt.tight_layout()
 
-    path = f"resultados/heatmap_{proyecto_id}.png"
-    plt.savefig(path, dpi=150)
+    output_path = f"resultados/heatmap_porcentaje_{proyecto_id}.png"
+    plt.savefig(output_path, dpi=150)
     plt.close()
 
-    return FileResponse(path, media_type="image/png", filename=f"heatmap_{proyecto_id}.png")
-
+    return FileResponse(output_path, media_type="image/png", filename=f"heatmap_porcentaje_{proyecto_id}.png")
 
 @app.get("/proyectos")
 def listar_proyectos(usuario=Depends(obtener_usuario_desde_token), db: Session = Depends(get_db)):

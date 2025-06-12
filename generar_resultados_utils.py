@@ -44,7 +44,7 @@ def generar_heatmap_por_archivo(resultados, output_path="heatmap.png"):
     plt.close()
 
 
-def generar_pdf_reporte(resultados, stats, output_path="reporte.pdf"):
+def generar_pdf_reporte(resultados, stats, tipo_counter=None, output_path="reporte.pdf"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -59,6 +59,15 @@ def generar_pdf_reporte(resultados, stats, output_path="reporte.pdf"):
         pdf.set_font("Arial", '', 11)
         for clave, valor in stats.items():
             pdf.cell(200, 8, txt=unidecode(f"{clave}: {valor}"), ln=True)
+        pdf.ln(5)
+        
+    if tipo_counter:
+        pdf.set_font("Arial", 'B', 12)
+        pdf.set_fill_color(230, 230, 230)
+        pdf.cell(200, 8, txt=unidecode("Conteo de vulnerabilidades por tipo"), ln=True, fill=True)
+        pdf.set_font("Arial", '', 11)
+        for tipo, cantidad in tipo_counter.items():
+            pdf.cell(200, 8, txt=unidecode(f" - {tipo}: {cantidad}"), ln=True)
         pdf.ln(5)
 
     agrupado = {}
