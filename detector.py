@@ -89,8 +89,9 @@ class SQLiDetector(JavaParserListener):
             self.variables_descontaminadas.add(stmt_var)
             
             # Marcar el parámetro como seguro (si es una variable)
-            if re.match(r'^\w+$', param_value):
-                self.variables_descontaminadas.add(param_value)
+            base_var = re.match(r'(\w+)', param_value)
+            if base_var:
+                self.variables_descontaminadas.add(base_var.group(1))
             
             # Si el parámetro viene de un método get de una entidad, marcar el objeto como seguro
             getter_match = re.search(r'(\w+)\.get\w+\(\)', param_value)
