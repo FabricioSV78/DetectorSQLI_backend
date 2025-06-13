@@ -41,19 +41,6 @@ PALABRAS_SQL = ["SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "EXEC", "UNION",
 VARIABLES_IGNORADAS = {"event", "e", "evt", "args"}
 PRACTICAS_SEGURAS = ["PreparedStatement", "setString", "setInt", "setBoolean", "setDate", "setParameter"]
 
-# Agregar al inicio del archivo, con las otras constantes
-METODOS_SANITIZACION = [
-    "escapeSql", "encode", "sanitize", "validate", 
-    "clean", "filter", "escape", "encodeForSQL",
-    "isSafeString", "stripXSS", "htmlEncode",
-    "whitelist", "isNumeric", "getSafeString"
-]
-
-LIBRERIAS_SEGURAS = [
-    "StringEscapeUtils", "ESAPI", "OWASP", 
-    "SqlSanitizer", "SecurityUtils", "SanitizationHelper"
-]
-
 class SQLiDetector(JavaParserListener):
     def __init__(self, archivo_fuente=""):
         self.variables_riesgosas = {}
@@ -63,8 +50,6 @@ class SQLiDetector(JavaParserListener):
         self.codigo_fuente = {}
         self.archivo_actual = archivo_fuente
         self.grafo_codigo = nx.DiGraph()
-        self.metodos_sanitizacion_detectados = set()
-        self.imports_seguros = set()
         self.nombre_paquete = ""
         self.clase_actual = ""
         self.capa_actual = ""
@@ -74,7 +59,6 @@ class SQLiDetector(JavaParserListener):
                 self.codigo_fuente_lineas = f.readlines()
         else:
             self.codigo_fuente_lineas = []
-            
 
     def enterCompilationUnit(self, ctx):
         if ctx.packageDeclaration():
@@ -137,36 +121,6 @@ class SQLiDetector(JavaParserListener):
                     if (nombre_param not in VARIABLES_IGNORADAS and 
                         not tipo_param.endswith("Entidad")):
                         self.variables_riesgosas[nombre_param] = (ctx.start.line, "PARAMETER")
-    
-    def enterImportDeclaration(self, ctx):
-        import_text = ctx.getText()
-        for lib in LIBRERIAS_SEGURAS:
-            if lib.lower() in import_text.lower():
-                self.imports_seguros.add(lib)
-                print(f"[INFO] Detectada librería segura: {lib}")
-    
-    def enterMethodCall(self, ctx):
-        if self.clase_actual is None:
-            return
-            
-        metodo_llamado = ctx.identifier().getText()
-        texto_llamada = ctx.getText()
-        
-        # Detectar si es un método de sanitización
-        if any(sanit_method.lower() in metodo_llamado.lower() 
-               for sanit_method in METODOS_SANITIZACION):
-            
-            # Verificar si la llamada está asignada a una variable
-            parent = ctx.parentCtx
-            if hasattr(parent, 'expression') and hasattr(parent.expression, 'variableDeclaratorId'):
-                var_name = parent.expression.variableDeclaratorId().getText()
-                self.variables_descontaminadas.add(var_name)
-                print(f"[INFO] Variable sanitizada: {var_name} via {metodo_llamado}")
-            
-            # Verificar si se usa directamente en un SQL
-            elif 'PreparedStatement' in texto_llamada or any(sql in texto_llamada.upper() for sql in PALABRAS_SQL):
-                self.metodos_sanitizacion_detectados.add(metodo_llamado)
-                print(f"[INFO] Sanitización directa detectada: {metodo_llamado}")
 
     def enterLocalVariableDeclaration(self, ctx):
         if self.clase_actual is None:
@@ -215,23 +169,6 @@ class SQLiDetector(JavaParserListener):
         linea = ctx.start.line
         self._capturar_fragmento_codigo(linea)
 
-        # Nueva verificación: ¿El código contiene métodos de sanitización?
-        contiene_sanitizacion = any(
-            sanit_method.lower() in texto.lower() 
-            for sanit_method in METODOS_SANITIZACION
-        )
-
-        # Si hay sanitización, marcamos las variables como seguras
-        if contiene_sanitizacion:
-            variables_en_linea = re.findall(r'\b\w+\b', texto)
-            for var in variables_en_linea:
-                if var in self.variables_riesgosas:
-                    self.variables_descontaminadas.add(var)
-                    print(f"[INFO] Variable {var} marcada como segura por sanitización")
-
-        # Resto de la lógica original...
-        # ... (código existente)
-
         if any(var in self.variables_descontaminadas for var in re.findall(r'\b\w+\b', texto)):
             return
 
@@ -277,25 +214,11 @@ class SQLiDetector(JavaParserListener):
         self.codigo_fuente[linea] = fragmento
 
     def _alert(self, linea, nivel, tipo, detalles):
-        codigo_linea = self.codigo_fuente.get(linea, "")
         mensaje_str = detalles if isinstance(detalles, str) else "|".join(detalles)
         clave = f"{self.archivo_actual}:{linea}-{tipo}-{mensaje_str}"
         if clave in self.alertas_emitidas:
             return
         self.alertas_emitidas.add(clave)
-        
-        # Verificar si hay métodos de sanitización en la línea
-        if any(sanit_method.lower() in codigo_linea.lower() 
-               for sanit_method in METODOS_SANITIZACION):
-            print(f"[INFO] Alerta suprimida por sanitización en línea {linea}")
-            return
-            
-        # Verificar si se usa alguna librería segura
-        if any(lib.lower() in codigo_linea.lower() 
-               for lib in self.imports_seguros):
-            print(f"[INFO] Alerta suprimida por uso de librería segura en línea {linea}")
-            return
-    
 
         for var in self.variables_riesgosas:
             if var in self.codigo_fuente.get(linea, ""):
@@ -319,8 +242,6 @@ class SQLiDetector(JavaParserListener):
                         print(f"[IGNORADO - No llega a datos y no está en capa lógica/presentación] {metodo_id}")
                         return
 
-
-
         alerta = {
             "nivel": nivel,
             "tipo": tipo,
@@ -332,7 +253,6 @@ class SQLiDetector(JavaParserListener):
         self.alertas_por_linea[linea].append(alerta)
 
     def hay_camino_hacia_datos(self, metodo_inicio, grafo):
-   
         # si el método ya pertenece a una clase DAO, no necesitamos buscar ruta
         nombre_clase = metodo_inicio.split(".")[0]
         if self._es_capa_datos(nombre_clase):
@@ -358,20 +278,12 @@ class SQLiDetector(JavaParserListener):
 
 
     def _es_capa_datos(self, nombre_clase):
-
         nombre = nombre_clase.lower()
         return (
             nombre.endswith("dao") or
             ".dao." in nombre or
             "datos" in nombre  
         )
-
-
-
-# --------------------------- ANALIZADOR DE PROYECTO ---------------------------
-#def guardar_resultados_en_json(resultados, path="resultados.json"):
-   # with open(path, "w", encoding="utf-8") as f:
-       # json.dump(resultados, f, indent=2, ensure_ascii=False)
 
 def analizar_proyecto(directorio):
     resultados = []
@@ -467,11 +379,6 @@ def mostrar_resultados(resultados, estadisticas):
     print(f"Archivos analizados      : {estadisticas['archivos analizados']}")
     print(f"Líneas con vulnerabilidad: {estadisticas['lineas afectadas']}")
     print(f"Tiempo total de análisis : {estadisticas['tiempo de analisis']} segundos")
-    print("\n=== SANITIZACIÓN DETECTADA ===")
-    if hasattr(estadisticas, 'metodos_sanitizacion_detectados'):
-        print(f"Métodos de sanitización usados: {estadisticas['metodos_sanitizacion_detectados']}")
-    if hasattr(estadisticas, 'imports_seguros'):
-        print(f"Librerías seguras importadas: {estadisticas['imports_seguros']}")
 
     if 'clases fuera de estándar' in estadisticas:
         print(f"Clases fuera de estándar : {estadisticas['clases fuera de estándar']}")
