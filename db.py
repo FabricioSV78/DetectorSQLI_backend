@@ -3,7 +3,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import os
 
-engine = create_engine("postgresql://postgres:Joseallain27@localhost:5432/taller_db")
+DATABASE_VE = os.getenv("DATABASE_VE")
+
+engine = create_engine(DATABASE_VE)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
