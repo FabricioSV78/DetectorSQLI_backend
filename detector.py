@@ -131,83 +131,79 @@ class SQLiDetector(JavaParserListener):
         metodo_id = f"{self.clase_actual}.{self.metodo_actual}"
         matches = re.findall(r'(\w+)\s+(\w+)', texto)
 
-        # Detección mejorada de PreparedStatement
-        if "PreparedStatement" in texto and "prepareStatement" in texto:
-            # Marcar todas las variables del PreparedStatement como seguras
-            for tipo, nombre in matches:
-                if tipo == "PreparedStatement":
-                    self.variables_descontaminadas.add(nombre)
-                    # Marcar también la variable SQL si usa parámetros (?)
-                    if "?" in texto:
-                        sql_var = re.search(r'(String\s+(\w+)\s*=\s*"[^"]\?[^"]")', texto)
-                        if sql_var:
-                            self.variables_descontaminadas.add(sql_var.group(2))
+        # Detección de PreparedStatement sin depender del tipo explícito
+        if "prepareStatement" in texto:
+            var_match = re.search(r'(\w+)\s*=\s*\w+\.prepareStatement\(', texto)
+            if var_match:
+                ps_var = var_match.group(1)
+                self.variables_descontaminadas.add(ps_var)
 
-        # Procesar todas las variables declaradas
+        # También detectamos si la SQL contiene parámetros seguros
+        if re.search(r'String\s+(\w+)\s*=\s*"[^"]*\?[^"]*"', texto):
+            sql_var_match = re.findall(r'String\s+(\w+)\s*=', texto)
+            for sql_var in sql_var_match:
+                self.variables_descontaminadas.add(sql_var)
+
+        # Añadimos a grafo
         for tipo, nombre in matches:
             nodo_var = f"{metodo_id}.{nombre}"
             self.grafo_codigo.add_node(nodo_var, tipo="variable")
             self.grafo_codigo.add_edge(metodo_id, nodo_var)
 
-        # Verificación de vulnerabilidad solo si no es consulta preparada
-        es_consulta_preparada = (
-            "PreparedStatement" in texto and 
-            "?" in texto and 
-            "prepareStatement" in texto
-        )
-        
+        # Detección de SQL vulnerable solo si no es consulta preparada
         contiene_sql = any(sql in texto_up for sql in PALABRAS_SQL) and ('"' in texto or "'" in texto)
-
-        if not es_consulta_preparada:
-            for var in self.variables_riesgosas:
-                if var in texto and contiene_sql:
-                    if var in self.variables_descontaminadas:
-                        continue
-                    self._alert(linea, "CRÍTICO", "SQLi por uso de parámetro no validado",
+        for var in self.variables_riesgosas:
+            if var in texto and contiene_sql:
+                if var in self.variables_descontaminadas:
+                    continue
+                self._alert(linea, "CRÍTICO", "SQLi por uso de parámetro no validado",
                             f"Se usa la variable '{var}' directamente en SQL en {self.capa_actual.upper()}")
+
 
     def enterStatement(self, ctx):
         if self.clase_actual is None:
             return
+
         texto = ctx.getText()
         texto_up = texto.upper()
         linea = ctx.start.line
         self._capturar_fragmento_codigo(linea)
 
-        if "preparestatement" in texto_up and "?" in texto and "+" not in texto:
+        if any(var in self.variables_descontaminadas for var in re.findall(r'\b\w+\b', texto)):
             return
 
-        # Condición mejorada para consultas seguras
+        contiene_sql = any(sql in texto_up for sql in PALABRAS_SQL) and ('"' in texto or "'" in texto)
+
+        # PreparedStatement esté limpio de concatenaciones (+)
         es_consulta_segura = (
             any(practica in texto for practica in PRACTICAS_SEGURAS) or
             any(var in self.variables_descontaminadas for var in re.findall(r'\b\w+\b', texto)) or
-            ("PreparedStatement" in texto and "?" in texto) or
-            ("try" in texto and "PreparedStatement" in texto) or
+            ("PreparedStatement" in texto and "?" in texto and "+" not in texto) or  # ← 🔧 aquí agregamos esto
+            ("try" in texto and "PreparedStatement" in texto and "+" not in texto) or
             any(texto.strip().startswith(f"{var}.") for var in self.variables_descontaminadas)
         )
-        
-        contiene_sql = any(sql in texto_up for sql in PALABRAS_SQL) and ('"' in texto or "'" in texto)
 
-        # Lógica de detección de vulnerabilidades
+        # Lógica de detección si NO es consulta segura
         if not es_consulta_segura:
-            # Detección de concatenación SQL insegura
+            # Concatenación insegura
             if '+' in texto and contiene_sql:
                 for var in self.variables_riesgosas:
                     if var in texto and var not in self.variables_descontaminadas:
                         self._alert(linea, "CRÍTICO", "SQLi por concatenación",
-                                f"Variable '{var}' concatenada en SQL en {self.capa_actual.upper()}")
+                                    f"Variable '{var}' concatenada en SQL en {self.capa_actual.upper()}")
 
-            # Detección de uso directo de variables en SQL
+            # Uso directo de variable en SQL
             for var in self.variables_riesgosas:
                 if var in texto and contiene_sql and var not in self.variables_descontaminadas:
                     self._alert(linea, "CRÍTICO", "SQLi por parámetro no validado",
-                            f"Variable '{var}' usada directamente en SQL")
+                                f"Variable '{var}' usada directamente en SQL")
 
-        # Detección de Statement inseguros (solo si no es contexto seguro)
+        # Detección de métodos peligrosos (como createStatement)
         if any(metodo in texto for metodo in MALAS_PRACTICAS) and not es_consulta_segura:
             if self.capa_actual in ["presentacion", "logica"] and contiene_sql:
                 self._alert(linea, "CRÍTICO", "Violación de arquitectura",
-                        f"SQL ejecutado directamente en capa {self.capa_actual.upper()}")
+                            f"SQL ejecutado directamente en capa {self.capa_actual.upper()}")
+
 
     def _capturar_fragmento_codigo(self, linea):
         if not self.codigo_fuente_lineas:
@@ -226,11 +222,16 @@ class SQLiDetector(JavaParserListener):
 
         for var in self.variables_riesgosas:
             if var in self.codigo_fuente.get(linea, ""):
+                # Si la variable fue desinfectada (por uso en PreparedStatement), saltar
+                if var in self.variables_descontaminadas:
+                    continue
+
                 metodo_id = f"{self.clase_actual}.{self.metodo_actual}"
                 nodo_var = f"{metodo_id}.{var}"
                 if self.grafo_codigo.has_node(nodo_var):
                     self.grafo_codigo.nodes[nodo_var]["riesgoso"] = True
-                # Verificar si la vulnerabilidad llega hasta la capa de datos
+
+                # Verificamos si la vulnerabilidad llega hasta la capa de datos
                 if self.grafo_codigo.has_node(metodo_id):
                     if self.hay_camino_hacia_datos(metodo_id, self.grafo_codigo):
                         self.grafo_codigo.nodes[metodo_id]["riesgoso"] = True
@@ -240,6 +241,7 @@ class SQLiDetector(JavaParserListener):
                     else:
                         print(f"[IGNORADO - No llega a datos y no está en capa lógica/presentación] {metodo_id}")
                         return
+
 
 
         alerta = {
