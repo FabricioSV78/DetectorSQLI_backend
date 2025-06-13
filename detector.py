@@ -174,6 +174,9 @@ class SQLiDetector(JavaParserListener):
         linea = ctx.start.line
         self._capturar_fragmento_codigo(linea)
 
+        if "preparestatement" in texto_up and "?" in texto and "+" not in texto:
+            return
+
         # Condición mejorada para consultas seguras
         es_consulta_segura = (
             any(practica in texto for practica in PRACTICAS_SEGURAS) or
