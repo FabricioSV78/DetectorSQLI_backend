@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+fpdf
+antlr4-python3-runtime
+networkx
+matplotlib
+pyvis
+python-multipart
+unidecode
+SQLAlchemy
+passlib[bcrypt]
+python-jose
+bcrypt
+psycopg2-binary
+seaborn

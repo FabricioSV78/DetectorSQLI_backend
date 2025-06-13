@@ -1,0 +1,37 @@
+[
+  {
+    "archivo": "project\\src\\com\\miapp\\datos\\UsuarioDAO.java",
+    "linea": 11,
+    "codigo": "// ✅ Forma segura (sin vulnerabilidad):\n        String query = \"SELECT * FROM usuarios WHERE id = ?\";\n        PreparedStatement ps = conn.prepareStatement(query);",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'id' directamente en una sentencia SQL en la capa 'DATOS'. Esto puede permitir inyección SQL si no se valida correctamente."
+    ]
+  },
+  {
+    "archivo": "project\\src\\com\\miapp\\datos\\UsuarioDAO.java",
+    "linea": 19,
+    "codigo": "// ❌ Mala práctica incluso en la capa DAO:\n        String query = \"SELECT * FROM usuarios WHERE id = \" + id;\n        conn.createStatement().executeQuery(query);",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'id' directamente en una sentencia SQL en la capa 'DATOS'. Esto puede permitir inyección SQL si no se valida correctamente."
+    ]
+  },
+  {
+    "archivo": "project\\src\\com\\miapp\\logica\\UsuarioService.java",
+    "linea": 7,
+    "codigo": "// ❌ Este método debería validar la entrada antes de usarla\n        return \"SELECT * FROM usuarios WHERE id = \" + id;\n    }",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'id' directamente en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL si no se valida correctamente.",
+      "[CRÍTICO] SQLi por concatenación: La variable 'id' contaminada se concatena en una sentencia SQL en la capa 'LOGICA'. Esto puede permitir inyección SQL."
+    ]
+  },
+  {
+    "archivo": "project\\src\\com\\miapp\\presentacion\\UsuarioController.java",
+    "linea": 12,
+    "codigo": "try {\n            Statement stmt = conn.createStatement(); // ❌ Mala práctica fuera de DAO",
+    "detalles": [
+      "[CRÍTICO] SQLi por uso de parámetro no validado: Se usa la variable 'conn' directamente en una sentencia SQL en la capa 'PRESENTACION'. Esto puede permitir inyección SQL si no se valida correctamente.",
+      "[CRÍTICO] SQLi por concatenación: La variable 'conn' contaminada se concatena en una sentencia SQL en la capa 'PRESENTACION'. Esto puede permitir inyección SQL.",
+      "[CRÍTICO] Violación de arquitectura N-capas: En la capa 'PRESENTACION' no está permitido ejecutar sentencias SQL directamente. Las operaciones SQL deben realizarse solo en la capa de datos."
+    ]
+  }
+]
