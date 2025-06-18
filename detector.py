@@ -156,8 +156,12 @@ class SQLiDetector(JavaParserListener):
             if var in texto and contiene_sql:
                 if var in self.variables_descontaminadas:
                     continue
+                # si es una consulta preparada con parámetros seguros, no alertar
+                if '?' in texto and 'prepareStatement' in texto:
+                    continue
                 self._alert(linea, "CRÍTICO", "SQLi por uso de parámetro no validado",
                             f"Se usa la variable '{var}' directamente en SQL en {self.capa_actual.upper()}")
+
 
 
     def enterStatement(self, ctx):

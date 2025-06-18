@@ -27,20 +27,31 @@ def analizar_codigo_java(codigo_str):
     os.remove(tmp_path)
     return detector.alertas_por_linea
 
-def test_sql_fuera_de_capa_datos():
+def test_violacion_arquitectura():
     codigo = '''
-        package Presentacion;
+        package presentacion;
+        import java.sql.Connection;
+        import java.sql.Statement;
 
         public class LoginController {
+            private Connection conn;
+
             public void login(String usuario) {
-                String sql = "SELECT * FROM usuarios WHERE nombre='" + usuario + "'";
-                System.out.println(sql);
+                try {
+                    Statement stmt = conn.createStatement();
+                    String sql = "SELECT * FROM usuarios WHERE nombre='" + usuario + "'";
+                    stmt.execute(sql);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     '''
     alertas = analizar_codigo_java(codigo)
     print(alertas)
-    assert any("SQLi" in a["tipo"] for lista in alertas.values() for a in lista)
+    tipos = [a["tipo"] for lista in alertas.values() for a in lista]
+    assert "Violación de arquitectura" in tipos
+    assert "SQLi por uso de parámetro no validado" in tipos  # opcionalmente
 
 
 def test_inyeccion_sql_por_concatenacion():
@@ -50,26 +61,28 @@ def test_inyeccion_sql_por_concatenacion():
 
         public class UsuarioDAO {
             public void buscar(String id) {
-                String sql = "SELECT * FROM usuarios WHERE id=" + id;
                 Statement stmt = conn.createStatement();
-                stmt.execute(sql);
+                stmt.execute("SELECT * FROM usuarios WHERE id=" + id);
             }
         }
     '''
     alertas = analizar_codigo_java(codigo)
     print(alertas)
-    assert any("SQLi" in a["tipo"] for lista in alertas.values() for a in lista)
+    tipos = [a["tipo"] for lista in alertas.values() for a in lista]
+    assert "SQLi por concatenación" in tipos
+
+
 
 
 def test_prepared_statement_seguro():
+    """No debe detectar vulnerabilidad al usar PreparedStatement correctamente"""
     codigo = '''
         package datos;
         import java.sql.PreparedStatement;
-
         public class ClienteDAO {
             public void buscarCliente(String nombre) throws Exception {
-                ps.setString(1, nombre);
                 PreparedStatement ps = conn.prepareStatement("SELECT * FROM clientes WHERE nombre=?");
+                ps.setString(1, nombre);
                 ps.executeQuery();
             }
         }
@@ -78,8 +91,6 @@ def test_prepared_statement_seguro():
     print(alertas)
     tipos = [a["tipo"] for lista in alertas.values() for a in lista]
     assert "SQLi por uso de parámetro no validado" not in tipos
-
-
 
 
 def test_codigo_sin_sql():
@@ -93,13 +104,14 @@ def test_codigo_sin_sql():
     alertas = analizar_codigo_java(codigo)
     assert not alertas
 
+
 def test_analizar_proyecto_basico(tmp_path):
-    # Crear estructura de proyecto Java simple
     proyecto_dir = tmp_path / "test_project"
     proyecto_dir.mkdir()
 
     archivo = proyecto_dir / "TestDAO.java"
     archivo.write_text("""
+        package datos;
         public class TestDAO {
             public void buscar(String input) {
                 String sql = "SELECT * FROM tabla WHERE valor=" + input;
@@ -109,7 +121,15 @@ def test_analizar_proyecto_basico(tmp_path):
 
     resultados, stats, grafo = analizar_proyecto(str(proyecto_dir))
 
-    assert isinstance(resultados, list)
     assert stats["archivos analizados"] == 1
     assert stats["lineas afectadas"] >= 1
     assert grafo.number_of_nodes() > 0
+
+    tipos = [detalle.split(":")[0].replace("[CRÍTICO] ", "") 
+             for a in resultados 
+             for detalle in a["detalles"]]
+
+    assert "SQLi por uso de parámetro no validado" in tipos
+    assert any("valor=" in a["codigo"] for a in resultados)
+
+
