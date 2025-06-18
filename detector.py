@@ -169,8 +169,16 @@ class SQLiDetector(JavaParserListener):
         linea = ctx.start.line
         self._capturar_fragmento_codigo(linea)
 
+        # descontaminar variable usada en setString
+        texto_sin_espacios = texto.replace(" ", "")
+        set_match = re.search(r'(\w+)\.(setString|setInt|setBoolean|setDate|setParameter)\(\d+,\s*(\w+)\)', texto_sin_espacios)
+        if set_match:
+            var_segura = set_match.group(3)
+            self.variables_descontaminadas.add(var_segura)
+
         if any(var in self.variables_descontaminadas for var in re.findall(r'\b\w+\b', texto)):
             return
+
 
         contiene_sql = any(sql in texto_up for sql in PALABRAS_SQL) and ('"' in texto or "'" in texto)
 
@@ -193,10 +201,13 @@ class SQLiDetector(JavaParserListener):
                                     f"Variable '{var}' concatenada en SQL en {self.capa_actual.upper()}")
 
             # Uso directo de variable en SQL
-            for var in self.variables_riesgosas:
-                if var in texto and contiene_sql and var not in self.variables_descontaminadas:
-                    self._alert(linea, "CRÍTICO", "SQLi por parámetro no validado",
-                                f"Variable '{var}' usada directamente en SQL")
+            if contiene_sql:
+                for var in self.variables_riesgosas:
+                    if var in texto:
+                        if var in self.variables_descontaminadas:
+                            continue
+                        self._alert(linea, "CRÍTICO", "SQLi por uso de parámetro no validado",
+                                    f"Se usa la variable '{var}' directamente en SQL en {self.capa_actual.upper()}")
 
         # Detección de métodos peligrosos (como createStatement)
         if any(metodo in texto for metodo in MALAS_PRACTICAS) and not es_consulta_segura:
