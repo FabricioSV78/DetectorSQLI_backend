@@ -276,7 +276,7 @@ def extraer_paquete_java(codigo_fuente):
     match = re.search(r'^\s*package\s+([\w.]+);', codigo_fuente, re.MULTILINE)
     return match.group(1) if match else ""
 
-@app.get("/line-heatmap/{proyecto_id}")
+@app.get("/interactive-heatmap/{proyecto_id}")
 def generar_heatmap_agrupado(
     proyecto_id: int,
     usuario=Depends(obtener_usuario_desde_token),
