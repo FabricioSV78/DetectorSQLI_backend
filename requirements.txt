@@ -13,3 +13,5 @@ python-jose
 bcrypt
 psycopg2-binary
 seaborn
+plotly
+
