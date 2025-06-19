@@ -75,15 +75,19 @@ def test_inyeccion_sql_por_concatenacion():
 
 
 def test_prepared_statement_seguro():
-    """No debe detectar vulnerabilidad al usar PreparedStatement correctamente"""
     codigo = '''
         package datos;
-        import java.sql.PreparedStatement;
-        public class ClienteDAO {
-            public void buscarCliente(String nombre) throws Exception {
-                PreparedStatement ps = conn.prepareStatement("SELECT * FROM clientes WHERE nombre=?");
-                ps.setString(1, nombre);
-                ps.executeQuery();
+
+        import java.sql.*;
+
+        public class ReservaDAO {
+            public void insertar(String usuario, int libroId) throws SQLException {
+                Connection conn = DriverManager.getConnection("jdbc:mysql://localhost/db", "user", "pass");
+                String sql = "INSERT INTO reservas (usuario, libro_id) VALUES (?, ?)";
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ps.setString(1, usuario);
+                ps.setInt(2, libroId);
+                ps.executeUpdate();
             }
         }
     '''
@@ -91,6 +95,7 @@ def test_prepared_statement_seguro():
     print(alertas)
     tipos = [a["tipo"] for lista in alertas.values() for a in lista]
     assert "SQLi por uso de parámetro no validado" not in tipos
+    
 
 
 def test_codigo_sin_sql():

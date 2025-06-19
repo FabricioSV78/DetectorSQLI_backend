@@ -125,6 +125,21 @@ class SQLiDetector(JavaParserListener):
     def enterLocalVariableDeclaration(self, ctx):
         if self.clase_actual is None:
             return
+        try:
+            tipo_variable = ctx.typeType().getText()
+            # Una declaración puede tener múltiples variables (ej: int i, j;)
+            for var_declarator in ctx.variableDeclarators().variableDeclarator():
+                nombre_variable = var_declarator.variableDeclaratorId().getText()
+                self.tabla_de_simbolos[nombre_variable] = tipo_variable
+                
+                # --- El resto de tu lógica para añadir nodos al grafo y detectar SQLi se mantiene ---
+                metodo_id = f"{self.clase_actual}.{self.metodo_actual}"
+                nodo_var = f"{metodo_id}.{nombre_variable}"
+                self.grafo_codigo.add_node(nodo_var, tipo="variable")
+                self.grafo_codigo.add_edge(metodo_id, nodo_var)
+
+        except Exception as e:
+            pass
         texto = ctx.getText()
         texto_up = texto.upper()
         linea = ctx.start.line
@@ -132,37 +147,50 @@ class SQLiDetector(JavaParserListener):
         metodo_id = f"{self.clase_actual}.{self.metodo_actual}"
         matches = re.findall(r'(\w+)\s+(\w+)', texto)
 
-        # Detección de PreparedStatement sin depender del tipo explícito
-        if "prepareStatement" in texto:
-            var_match = re.search(r'(\w+)\s*=\s*\w+\.prepareStatement\(', texto)
-            if var_match:
-                ps_var = var_match.group(1)
-                self.variables_descontaminadas.add(ps_var)
+        # Detección mejorada de PreparedStatement
+        es_consulta_preparada = (
+            "PreparedStatement" in texto or 
+            "?" in texto or 
+            "prepareStatement" in texto
+        )
+        
+        if es_consulta_preparada:
+            # Marcar todas las variables del PreparedStatement como seguras
+            for tipo, nombre in matches:
+                if tipo == "PreparedStatement":
+                    self.variables_descontaminadas.add(nombre)
+            
+            # Marcar también la variable SQL usada en prepareStatement
+            prepare_stmt_match = re.search(r'\.prepareStatement\s*\((\w+)\)', texto)
+            if prepare_stmt_match:
+                sql_var = prepare_stmt_match.group(1)
+                self.variables_descontaminadas.add(sql_var)
+        
+        print(self.variables_descontaminadas)
 
-        # También detectamos si la SQL contiene parámetros seguros
-        sql_match = re.findall(r'(\w+)\s*=\s*"[^"]*\?[^"]*"', texto)
-        for sql_var in sql_match:
-            self.variables_descontaminadas.add(sql_var)
-
-        # Añadimos a grafo
+        # Procesar todas las variables declaradas
         for tipo, nombre in matches:
             nodo_var = f"{metodo_id}.{nombre}"
             self.grafo_codigo.add_node(nodo_var, tipo="variable")
             self.grafo_codigo.add_edge(metodo_id, nodo_var)
 
-        # Detección de SQL vulnerable solo si no es consulta preparada
-        contiene_sql = any(sql in texto_up for sql in PALABRAS_SQL) and ('"' in texto or "'" in texto)
-        for var in self.variables_riesgosas:
-            if var in texto and contiene_sql:
-                if var in self.variables_descontaminadas:
-                    continue
-                # si es una consulta preparada con parámetros seguros, no alertar
-                if '?' in texto and 'prepareStatement' in texto:
-                    continue
-                self._alert(linea, "CRÍTICO", "SQLi por uso de parámetro no validado",
-                            f"Se usa la variable '{var}' directamente en SQL en {self.capa_actual.upper()}")
+        # Mejor detección de SQL - ignorar texto entre comillas
+        contiene_sql = any(
+            sql in texto_up for sql in PALABRAS_SQL
+        ) and ('"' in texto or "'" in texto)
+        
+        # Extraer solo el texto fuera de comillas para verificar uso de variables
+        texto_sin_comillas = re.sub(r'"[^"]*"', '', texto)  # Elimina contenido entre comillas dobles
+        texto_sin_comillas = re.sub(r"'[^']*'", '', texto_sin_comillas)  # Elimina contenido entre comillas simples
 
-
+        if not es_consulta_preparada:
+            for var in self.variables_riesgosas:
+                # Verificar si la variable aparece fuera de comillas y hay palabras SQL
+                if (var in texto_sin_comillas and 
+                    contiene_sql and 
+                    var not in self.variables_descontaminadas):
+                    self._alert(linea, "CRÍTICO", "SQLi por uso de parámetro no validado",
+                            f"Se usa la variable '{var}' directamente en SQL en la capa {self.capa_actual.upper()}")
 
     def enterStatement(self, ctx):
         if self.clase_actual is None:
@@ -190,7 +218,7 @@ class SQLiDetector(JavaParserListener):
         es_consulta_segura = (
             any(practica in texto for practica in PRACTICAS_SEGURAS) or
             any(var in self.variables_descontaminadas for var in re.findall(r'\b\w+\b', texto)) or
-            ("PreparedStatement" in texto and "?" in texto and "+" not in texto) or  # ← 🔧 aquí agregamos esto
+            ("PreparedStatement" in texto and "?" in texto and "+" not in texto) or  
             ("try" in texto and "PreparedStatement" in texto and "+" not in texto) or
             any(texto.strip().startswith(f"{var}.") for var in self.variables_descontaminadas)
         )
