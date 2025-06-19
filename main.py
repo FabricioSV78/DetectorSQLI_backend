@@ -20,6 +20,8 @@ from db import get_db
 from modelos import Proyecto, Archivo, Vulnerabilidad
 from generar_resultados_utils import mostrar_grafo_interactivo, generar_heatmap_por_archivo, generar_pdf_reporte 
 from collections import Counter
+import plotly.graph_objects as go
+from collections import defaultdict
 
 app = FastAPI()
 
@@ -275,65 +277,133 @@ def extraer_paquete_java(codigo_fuente):
     return match.group(1) if match else ""
 
 @app.get("/line-heatmap/{proyecto_id}")
-def generar_line_heatmap(
+def generar_heatmap_agrupado(
     proyecto_id: int,
     usuario=Depends(obtener_usuario_desde_token),
     db: Session = Depends(get_db)
 ):
     proyecto = db.query(Proyecto).filter_by(id=proyecto_id, usuario_id=usuario.id).first()
     if not proyecto:
-        raise HTTPException(status_code=403, detail="Proyecto no encontrado o no autorizado")
+        raise HTTPException(status_code=403, detail="Proyecto no autorizado")
 
     archivos = db.query(Archivo).filter_by(proyecto_id=proyecto_id).all()
     if not archivos:
         raise HTTPException(status_code=404, detail="No hay archivos para este proyecto")
 
-    x_total_lineas = []
-    y_porcentaje_vulnerables = []
+    x_lineas = []
+    y_vuln_pct = []
+
+    datos_archivos = []
 
     for archivo in archivos:
-        total_lineas = archivo.codigo_fuente.count("\n")
-        vulns = db.query(Vulnerabilidad).filter_by(archivo_id=archivo.id).all()
-        lineas_vulnerables = len(vulns)
+        total = archivo.codigo_fuente.count("\n")
+        num_vulns = db.query(Vulnerabilidad).filter_by(archivo_id=archivo.id).count()
 
-        if total_lineas > 0:
-            porcentaje = (lineas_vulnerables / total_lineas) * 100
-            x_total_lineas.append(total_lineas)
-            y_porcentaje_vulnerables.append(porcentaje)
+        if total > 0:
+            porcentaje = (num_vulns / total) * 100
+            x_lineas.append(total)
+            y_vuln_pct.append(porcentaje)
+            datos_archivos.append({
+                "archivo": archivo,
+                "lineas": total,
+                "porcentaje": porcentaje,
+                "vulnerabilidades": num_vulns
+            })
 
-    if not x_total_lineas or not y_porcentaje_vulnerables:
+    if not x_lineas:
         raise HTTPException(status_code=404, detail="No hay datos para graficar")
 
-    # Crear figura
-    plt.figure(figsize=(10, 8))
-    sns.set(style="whitegrid")
+    # Configuración de bins
+    nbinsx = 20
+    nbinsy = 20
 
-    # Crear histograma 2D: líneas totales vs % de vulnerabilidad
-    heatmap, xedges, yedges, img = plt.hist2d(
-        x_total_lineas,
-        y_porcentaje_vulnerables,
-        bins=[20, 20],
-        cmap="YlOrRd"
+    x_min, x_max = min(x_lineas), max(x_lineas)
+    y_min, y_max = min(y_vuln_pct), max(y_vuln_pct)
+
+    x_bins = np.linspace(x_min, x_max, nbinsx + 1)
+    y_bins = np.linspace(y_min, y_max, nbinsy + 1)
+
+    # Agrupación por bin
+    bin_info = defaultdict(list)
+
+    for data in datos_archivos:
+        x = data["lineas"]
+        y = data["porcentaje"]
+        archivo = data["archivo"]
+        num_vulns = data["vulnerabilidades"]
+
+        x_bin = min(np.digitize(x, x_bins) - 1, nbinsx - 1)
+        y_bin = min(np.digitize(y, y_bins) - 1, nbinsy - 1)
+        bin_key = (x_bin, y_bin)
+
+        bin_info[bin_key].append(f"""
+            <b>Archivo:</b> {archivo.nombre}<br>
+            <b>Líneas totales:</b> {x}<br>
+            <b>Vulnerabilidades:</b> {num_vulns}<br>
+            <b>% Vulnerable:</b> {y:.2f}%<br><br>
+        """)
+
+    scatter_x = []
+    scatter_y = []
+    scatter_customdata = []
+
+    for (x_bin, y_bin), textos in bin_info.items():
+        x_center = (x_bins[x_bin] + x_bins[x_bin + 1]) / 2
+        y_center = (y_bins[y_bin] + y_bins[y_bin + 1]) / 2
+
+        scatter_x.append(x_center)
+        scatter_y.append(y_center)
+        scatter_customdata.append("".join(textos))
+
+    # Crear figura
+    fig = go.Figure()
+
+    # Heatmap
+    fig.add_trace(go.Histogram2d(
+        x=x_lineas,
+        y=y_vuln_pct,
+        colorscale='YlOrRd',
+        colorbar=dict(title='Cantidad de archivos'),
+        nbinsx=nbinsx,
+        nbinsy=nbinsy,
+        hoverinfo='none'
+    ))
+
+    # Puntos invisibles con datos agrupados
+    fig.add_trace(go.Scatter(
+        x=scatter_x,
+        y=scatter_y,
+        mode='markers',
+        marker=dict(size=10, opacity=0, color='rgba(0,0,0,0)'),
+        customdata=scatter_customdata,
+        hovertemplate="%{customdata}<extra></extra>",
+        name="Archivos agrupados"
+    ))
+
+    # Layout
+    fig.update_layout(
+        title=f'Mapa de Calor Interactivo (Proyecto {proyecto_id})',
+        xaxis_title='Líneas totales por archivo',
+        yaxis_title='% de líneas vulnerables',
+        width=1000,
+        height=800,
+        template='plotly_white',
+        hovermode='closest',
+        showlegend=False,
+        annotations=[
+            dict(
+                x=0.5,
+                y=1.05,
+                xref='paper',
+                yref='paper',
+                text='Pasa el mouse sobre los puntos para ver detalles de cada archivo',
+                showarrow=False,
+                font=dict(size=12)
+            )
+        ]
     )
 
-    # Dibujar líneas de cuadrícula
-    for x in xedges:
-        plt.axvline(x, color='gray', linewidth=0.5, linestyle='--')
-    for y in yedges:
-        plt.axhline(y, color='gray', linewidth=0.5, linestyle='--')
-
-    # Etiquetas
-    plt.colorbar(label="Cantidad de Archivos")
-    plt.xlabel("Líneas totales por archivo")
-    plt.ylabel("Porcentaje de líneas vulnerables (%)")
-    plt.title("Mapa de Calor: Total de líneas vs % de vulnerabilidad")
-    plt.tight_layout()
-
-    output_path = f"resultados/heatmap_porcentaje_{proyecto_id}.png"
-    plt.savefig(output_path, dpi=150)
-    plt.close()
-
-    return FileResponse(output_path, media_type="image/png", filename=f"heatmap_porcentaje_{proyecto_id}.png")
+    return HTMLResponse(content=fig.to_html(full_html=True, include_plotlyjs='cdn'))
 
 @app.get("/proyectos")
 def listar_proyectos(usuario=Depends(obtener_usuario_desde_token), db: Session = Depends(get_db)):
